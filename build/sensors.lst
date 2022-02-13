@@ -1,0 +1,281 @@
+ARM GAS  C:\Users\sangt\AppData\Local\Temp\ccHd3v51.s 			page 1
+
+
+   1              		.cpu cortex-m4
+   2              		.arch armv7e-m
+   3              		.fpu fpv4-sp-d16
+   4              		.eabi_attribute 27, 1
+   5              		.eabi_attribute 28, 1
+   6              		.eabi_attribute 20, 1
+   7              		.eabi_attribute 21, 1
+   8              		.eabi_attribute 23, 3
+   9              		.eabi_attribute 24, 1
+  10              		.eabi_attribute 25, 1
+  11              		.eabi_attribute 26, 1
+  12              		.eabi_attribute 30, 1
+  13              		.eabi_attribute 34, 1
+  14              		.eabi_attribute 18, 4
+  15              		.file	"sensors.c"
+  16              		.text
+  17              	.Ltext0:
+  18              		.cfi_sections	.debug_frame
+  19              		.section	.text.sensors_init,"ax",%progbits
+  20              		.align	1
+  21              		.global	sensors_init
+  22              		.syntax unified
+  23              		.thumb
+  24              		.thumb_func
+  26              	sensors_init:
+  27              	.LVL0:
+  28              	.LFB235:
+  29              		.file 1 "Drivers/Sensors/sensors.c"
+   1:Drivers/Sensors/sensors.c **** /*
+   2:Drivers/Sensors/sensors.c **** File:                sensors.c
+   3:Drivers/Sensors/sensors.c **** Written by:             Sang Truong Tan
+   4:Drivers/Sensors/sensors.c **** Date Written:           02/12/2022
+   5:Drivers/Sensors/sensors.c **** Description:
+   6:Drivers/Sensors/sensors.c **** References:
+   7:Drivers/Sensors/sensors.c **** 
+   8:Drivers/Sensors/sensors.c **** *Copyright (C) 2022 - TTSang
+   9:Drivers/Sensors/sensors.c ****    This is a free software under the GNU license, you can redistribute it and/or modify it under th
+  10:Drivers/Sensors/sensors.c ****    of the GNU General Public Licenseversion 3 as published by the Free Software Foundation.
+  11:Drivers/Sensors/sensors.c **** 
+  12:Drivers/Sensors/sensors.c ****    This software library is shared with public for educational purposes, without WARRANTY and Autho
+  13:Drivers/Sensors/sensors.c ****    or indirectly by this software, read more about this on the GNU General Public License.
+  14:Drivers/Sensors/sensors.c **** */
+  15:Drivers/Sensors/sensors.c **** 
+  16:Drivers/Sensors/sensors.c **** /* Private includes ----------------------------------------------------------*/
+  17:Drivers/Sensors/sensors.c **** #include "sensors.h"
+  18:Drivers/Sensors/sensors.c **** 
+  19:Drivers/Sensors/sensors.c **** /* Private variables ---------------------------------------------------------*/
+  20:Drivers/Sensors/sensors.c **** struct sensor_handle_t senHandler;
+  21:Drivers/Sensors/sensors.c **** 
+  22:Drivers/Sensors/sensors.c **** /* Function definations ------------------------------------------------------*/
+  23:Drivers/Sensors/sensors.c **** /**
+  24:Drivers/Sensors/sensors.c ****   * @brief  Initialize sensors.
+  25:Drivers/Sensors/sensors.c ****   * @param init the initial condition for sensors.
+  26:Drivers/Sensors/sensors.c ****   * @retval sensor_handle_t
+  27:Drivers/Sensors/sensors.c ****   */
+  28:Drivers/Sensors/sensors.c **** sensor_handle_t sensors_init (sensor_handle_t init) {
+  30              		.loc 1 28 53 view -0
+ARM GAS  C:\Users\sangt\AppData\Local\Temp\ccHd3v51.s 			page 2
+
+
+  31              		.cfi_startproc
+  32              		@ args = 36, pretend = 16, frame = 0
+  33              		@ frame_needed = 0, uses_anonymous_args = 0
+  34              		.loc 1 28 53 is_stmt 0 view .LVU1
+  35 0000 84B0     		sub	sp, sp, #16
+  36              	.LCFI0:
+  37              		.cfi_def_cfa_offset 16
+  38 0002 70B5     		push	{r4, r5, r6, lr}
+  39              	.LCFI1:
+  40              		.cfi_def_cfa_offset 32
+  41              		.cfi_offset 4, -32
+  42              		.cfi_offset 5, -28
+  43              		.cfi_offset 6, -24
+  44              		.cfi_offset 14, -20
+  45 0004 0546     		mov	r5, r0
+  46 0006 0DF1140C 		add	ip, sp, #20
+  47 000a 8CE80E00 		stm	ip, {r1, r2, r3}
+  29:Drivers/Sensors/sensors.c ****     //Init the mpu sensor
+  30:Drivers/Sensors/sensors.c ****     senHandler.mpuHandler = init.mpuHandler;
+  48              		.loc 1 30 5 is_stmt 1 view .LVU2
+  49              		.loc 1 30 27 is_stmt 0 view .LVU3
+  50 000e 104E     		ldr	r6, .L5
+  51 0010 3446     		mov	r4, r6
+  52 0012 BCE80F00 		ldmia	ip!, {r0, r1, r2, r3}
+  53              	.LVL1:
+  54              		.loc 1 30 27 view .LVU4
+  55 0016 0FC4     		stmia	r4!, {r0, r1, r2, r3}
+  56 0018 9CE80700 		ldm	ip, {r0, r1, r2}
+  57 001c 84E80700 		stm	r4, {r0, r1, r2}
+  31:Drivers/Sensors/sensors.c ****     senHandler.enableMPU = init.enableMPU;
+  58              		.loc 1 31 5 is_stmt 1 view .LVU5
+  59              		.loc 1 31 32 is_stmt 0 view .LVU6
+  60 0020 9DF83030 		ldrb	r3, [sp, #48]	@ zero_extendqisi2
+  61              		.loc 1 31 26 view .LVU7
+  62 0024 3377     		strb	r3, [r6, #28]
+  32:Drivers/Sensors/sensors.c ****     if (senHandler.enableMPU == true) {
+  63              		.loc 1 32 5 is_stmt 1 view .LVU8
+  64              		.loc 1 32 8 is_stmt 0 view .LVU9
+  65 0026 6BB9     		cbnz	r3, .L4
+  66              	.L2:
+  33:Drivers/Sensors/sensors.c ****       MPU6050_Init(senHandler.mpuHandler.Init, senHandler.mpuHandler.hi2c);
+  34:Drivers/Sensors/sensors.c ****     }
+  35:Drivers/Sensors/sensors.c ****     return senHandler;
+  67              		.loc 1 35 5 is_stmt 1 view .LVU10
+  68              		.loc 1 35 12 is_stmt 0 view .LVU11
+  69 0028 AC46     		mov	ip, r5
+  70 002a 094C     		ldr	r4, .L5
+  71 002c 0FCC     		ldmia	r4!, {r0, r1, r2, r3}
+  72 002e ACE80F00 		stmia	ip!, {r0, r1, r2, r3}
+  73 0032 94E80F00 		ldm	r4, {r0, r1, r2, r3}
+  74 0036 8CE80F00 		stm	ip, {r0, r1, r2, r3}
+  36:Drivers/Sensors/sensors.c **** }
+  75              		.loc 1 36 1 view .LVU12
+  76 003a 2846     		mov	r0, r5
+  77 003c BDE87040 		pop	{r4, r5, r6, lr}
+  78              	.LCFI2:
+  79              		.cfi_remember_state
+ARM GAS  C:\Users\sangt\AppData\Local\Temp\ccHd3v51.s 			page 3
+
+
+  80              		.cfi_restore 14
+  81              		.cfi_restore 6
+  82              		.cfi_restore 5
+  83              		.cfi_restore 4
+  84              		.cfi_def_cfa_offset 16
+  85              	.LVL2:
+  86              		.loc 1 36 1 view .LVU13
+  87 0040 04B0     		add	sp, sp, #16
+  88              	.LCFI3:
+  89              		.cfi_def_cfa_offset 0
+  90 0042 7047     		bx	lr
+  91              	.LVL3:
+  92              	.L4:
+  93              	.LCFI4:
+  94              		.cfi_restore_state
+  33:Drivers/Sensors/sensors.c ****       MPU6050_Init(senHandler.mpuHandler.Init, senHandler.mpuHandler.hi2c);
+  95              		.loc 1 33 7 is_stmt 1 view .LVU14
+  96 0044 3168     		ldr	r1, [r6]
+  97 0046 B068     		ldr	r0, [r6, #8]
+  98 0048 FFF7FEFF 		bl	MPU6050_Init
+  99              	.LVL4:
+ 100 004c ECE7     		b	.L2
+ 101              	.L6:
+ 102 004e 00BF     		.align	2
+ 103              	.L5:
+ 104 0050 00000000 		.word	.LANCHOR0
+ 105              		.cfi_endproc
+ 106              	.LFE235:
+ 108              		.section	.text.sensors_update,"ax",%progbits
+ 109              		.align	1
+ 110              		.global	sensors_update
+ 111              		.syntax unified
+ 112              		.thumb
+ 113              		.thumb_func
+ 115              	sensors_update:
+ 116              	.LVL5:
+ 117              	.LFB236:
+  37:Drivers/Sensors/sensors.c **** 
+  38:Drivers/Sensors/sensors.c **** /**
+  39:Drivers/Sensors/sensors.c ****   * @brief  Update sensors data. Must be call as interval with the dt value.
+  40:Drivers/Sensors/sensors.c ****   * @retval sensor_handle_t
+  41:Drivers/Sensors/sensors.c ****   */
+  42:Drivers/Sensors/sensors.c **** sensor_handle_t sensors_update (void) {
+ 118              		.loc 1 42 39 view -0
+ 119              		.cfi_startproc
+ 120              		@ args = 0, pretend = 0, frame = 32
+ 121              		@ frame_needed = 0, uses_anonymous_args = 0
+ 122              		.loc 1 42 39 is_stmt 0 view .LVU16
+ 123 0000 70B5     		push	{r4, r5, r6, lr}
+ 124              	.LCFI5:
+ 125              		.cfi_def_cfa_offset 16
+ 126              		.cfi_offset 4, -16
+ 127              		.cfi_offset 5, -12
+ 128              		.cfi_offset 6, -8
+ 129              		.cfi_offset 14, -4
+ 130 0002 88B0     		sub	sp, sp, #32
+ 131              	.LCFI6:
+ARM GAS  C:\Users\sangt\AppData\Local\Temp\ccHd3v51.s 			page 4
+
+
+ 132              		.cfi_def_cfa_offset 48
+ 133 0004 0546     		mov	r5, r0
+  43:Drivers/Sensors/sensors.c ****     if (senHandler.enableMPU == true) {
+ 134              		.loc 1 43 5 is_stmt 1 view .LVU17
+ 135              		.loc 1 43 19 is_stmt 0 view .LVU18
+ 136 0006 0D4B     		ldr	r3, .L11
+ 137 0008 1B7F     		ldrb	r3, [r3, #28]	@ zero_extendqisi2
+ 138              		.loc 1 43 8 view .LVU19
+ 139 000a 5BB9     		cbnz	r3, .L10
+ 140              	.LVL6:
+ 141              	.L8:
+  44:Drivers/Sensors/sensors.c ****       senHandler.mpuHandler = MPU6050_read_mpu_data();
+  45:Drivers/Sensors/sensors.c ****     }
+  46:Drivers/Sensors/sensors.c ****     return senHandler;
+ 142              		.loc 1 46 5 is_stmt 1 view .LVU20
+ 143              		.loc 1 46 12 is_stmt 0 view .LVU21
+ 144 000c AC46     		mov	ip, r5
+ 145 000e 0B4C     		ldr	r4, .L11
+ 146 0010 0FCC     		ldmia	r4!, {r0, r1, r2, r3}
+ 147 0012 ACE80F00 		stmia	ip!, {r0, r1, r2, r3}
+ 148 0016 94E80F00 		ldm	r4, {r0, r1, r2, r3}
+ 149 001a 8CE80F00 		stm	ip, {r0, r1, r2, r3}
+  47:Drivers/Sensors/sensors.c **** }
+ 150              		.loc 1 47 1 view .LVU22
+ 151 001e 2846     		mov	r0, r5
+ 152 0020 08B0     		add	sp, sp, #32
+ 153              	.LCFI7:
+ 154              		.cfi_remember_state
+ 155              		.cfi_def_cfa_offset 16
+ 156              		@ sp needed
+ 157 0022 70BD     		pop	{r4, r5, r6, pc}
+ 158              	.LVL7:
+ 159              	.L10:
+ 160              	.LCFI8:
+ 161              		.cfi_restore_state
+  44:Drivers/Sensors/sensors.c ****       senHandler.mpuHandler = MPU6050_read_mpu_data();
+ 162              		.loc 1 44 7 is_stmt 1 view .LVU23
+  44:Drivers/Sensors/sensors.c ****       senHandler.mpuHandler = MPU6050_read_mpu_data();
+ 163              		.loc 1 44 31 is_stmt 0 view .LVU24
+ 164 0024 6846     		mov	r0, sp
+ 165              	.LVL8:
+  44:Drivers/Sensors/sensors.c ****       senHandler.mpuHandler = MPU6050_read_mpu_data();
+ 166              		.loc 1 44 31 view .LVU25
+ 167 0026 FFF7FEFF 		bl	MPU6050_read_mpu_data
+ 168              	.LVL9:
+ 169 002a 044E     		ldr	r6, .L11
+ 170 002c 6C46     		mov	r4, sp
+ 171 002e 0FCC     		ldmia	r4!, {r0, r1, r2, r3}
+ 172 0030 0FC6     		stmia	r6!, {r0, r1, r2, r3}
+ 173 0032 94E80700 		ldm	r4, {r0, r1, r2}
+ 174 0036 86E80700 		stm	r6, {r0, r1, r2}
+ 175 003a E7E7     		b	.L8
+ 176              	.L12:
+ 177              		.align	2
+ 178              	.L11:
+ 179 003c 00000000 		.word	.LANCHOR0
+ 180              		.cfi_endproc
+ARM GAS  C:\Users\sangt\AppData\Local\Temp\ccHd3v51.s 			page 5
+
+
+ 181              	.LFE236:
+ 183              		.global	senHandler
+ 184              		.section	.bss.senHandler,"aw",%nobits
+ 185              		.align	2
+ 186              		.set	.LANCHOR0,. + 0
+ 189              	senHandler:
+ 190 0000 00000000 		.space	32
+ 190      00000000 
+ 190      00000000 
+ 190      00000000 
+ 190      00000000 
+ 191              		.text
+ 192              	.Letext0:
+ 193              		.file 2 "c:\\program files (x86)\\gnu arm embedded toolchain\\10 2021.10\\arm-none-eabi\\include\\
+ 194              		.file 3 "c:\\program files (x86)\\gnu arm embedded toolchain\\10 2021.10\\arm-none-eabi\\include\\
+ 195              		.file 4 "Drivers/CMSIS/Device/ST/STM32F4xx/Include/stm32f405xx.h"
+ 196              		.file 5 "Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_def.h"
+ 197              		.file 6 "Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_dma.h"
+ 198              		.file 7 "Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_i2c.h"
+ 199              		.file 8 "Drivers/MPU6050/Inc/ST_MPU6050.h"
+ 200              		.file 9 "Drivers/Sensors/sensors.h"
+ARM GAS  C:\Users\sangt\AppData\Local\Temp\ccHd3v51.s 			page 6
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 sensors.c
+C:\Users\sangt\AppData\Local\Temp\ccHd3v51.s:20     .text.sensors_init:00000000 $t
+C:\Users\sangt\AppData\Local\Temp\ccHd3v51.s:26     .text.sensors_init:00000000 sensors_init
+C:\Users\sangt\AppData\Local\Temp\ccHd3v51.s:104    .text.sensors_init:00000050 $d
+C:\Users\sangt\AppData\Local\Temp\ccHd3v51.s:109    .text.sensors_update:00000000 $t
+C:\Users\sangt\AppData\Local\Temp\ccHd3v51.s:115    .text.sensors_update:00000000 sensors_update
+C:\Users\sangt\AppData\Local\Temp\ccHd3v51.s:179    .text.sensors_update:0000003c $d
+C:\Users\sangt\AppData\Local\Temp\ccHd3v51.s:189    .bss.senHandler:00000000 senHandler
+C:\Users\sangt\AppData\Local\Temp\ccHd3v51.s:185    .bss.senHandler:00000000 $d
+
+UNDEFINED SYMBOLS
+MPU6050_Init
+MPU6050_read_mpu_data

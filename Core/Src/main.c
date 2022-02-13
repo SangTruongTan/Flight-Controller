@@ -22,12 +22,17 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+
+//FreeRTOS
 #include "FreeRTOS.h"
 #include "task.h"
 #include "timers.h"
 #include "queue.h"
 #include "semphr.h"
 #include "event_groups.h"
+
+//MEMS
+#include "sensors.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -61,6 +66,8 @@ UART_HandleTypeDef huart3;
 uint8_t count = 0;
 
 TaskHandle_t DefaultTask;
+
+sensor_handle_t SensorData;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -130,7 +137,7 @@ int main(void)
   MX_UART5_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
-  xTaskCreate(&Default_task, "Default", 128, NULL, 1, &DefaultTask);
+  xTaskCreate(&Default_task, "Default", 256, NULL, 1, &DefaultTask);
 
   //Start Scheduler
   vTaskStartScheduler();
@@ -539,11 +546,19 @@ PUTCHAR_PROTOTYPE {
 }
 
 void Default_task (void *pvParameters) {
+  sensor_handle_t sensors;
+  sensors.enableMPU =  true;
+  sensors.mpuHandler.hi2c = &hi2c1;
+  sensors.mpuHandler.Init.ui8AcceFullScale = MPU6050_ACCE_FULLSCALE_2G;
+  sensors.mpuHandler.Init.ui8DLPF = MPU6050_DLPF_4;
+  sensors.mpuHandler.Init.ui8GyroFullScale = MPU6050_GYRO_FULLSCALE_500DPS;
+  sensors_init(sensors);
   TickType_t xTimerStart = xTaskGetTickCount();
   for(;;) {
     HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
     HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
-    vTaskDelayUntil(&xTimerStart, 1000);
+    SensorData = sensors_update();
+    vTaskDelayUntil(&xTimerStart, 500);
   }
 }
 /* USER CODE END 4 */
