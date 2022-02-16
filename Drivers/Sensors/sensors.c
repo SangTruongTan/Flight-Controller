@@ -71,6 +71,7 @@ Sensor_status_t sensors_init (Sensor_handle_t *Handle) {
       } else {
         senStatus = SENSOR_ERROR_HMC;
       }
+      senStatus = SENSOR_ERROR_HMC;
     }
   }
   return senStatus;
