@@ -23,10 +23,10 @@ References:
 
 /* Private typedef -----------------------------------------------------------*/
 typedef enum HMC5883L_Status_t {
-   HMC5883L_OK,
-   HMC5883L_ERROR,
-   HMC5883L_TIMEOUT,
-   HMC5883L_BUSY,
+   HMC5883L_OK = 0,
+   HMC5883L_ERROR = 1,
+   HMC5883L_BUSY = 2,
+   HMC5883L_TIMEOUT = 3,
 } HMC5883L_Status_t;
 
 typedef enum HMC5883L_State_t {
@@ -44,9 +44,9 @@ typedef struct HMC5883L_Init_t {
 } HMC5883L_Init_t;
 
 typedef struct HMC5883L_Raw_t {
-   uint16_t x;
-   uint16_t y;
-   uint16_t z;
+   int16_t x;
+   int16_t y;
+   int16_t z;
 } HMC5883L_Raw_t;
 
 typedef struct HMC5883L_Scaled_t {
@@ -60,12 +60,13 @@ typedef struct HMC5883L_Handle_t {
    HMC5883L_Status_t Status;
    HMC5883L_State_t State;
    HMC5883L_Init_t Init;
+   HMC5883L_Raw_t Raw;
+   HMC5883L_Scaled_t Scaled;
    float Resolution;
 } HMC5883L_Handle_t;
 
 /* Private define ------------------------------------------------------------*/
-#define HMC5883L_ADDRESS            0x1E // this device only has one address
-#define HMC5883L_DEFAULT_ADDRESS    0x1E
+#define HMC5883L_ADDRESS            ((uint8_t)0x1E << 1) // this device only has one address
 
 #define HMC5883L_RA_CONFIG_A        0x00
 #define HMC5883L_RA_CONFIG_B        0x01
@@ -180,9 +181,16 @@ bool HMC5883L_Check_DRY (HMC5883L_Handle_t *Handle);
 /**
  * @brief Read the raw data at three axis.
  * @param Handle The pointer of the handle type.
- * @retval HMC5883L_Raw_t The value of the field strength at raw type.
+ * @retval HMC5883L_Status_t The status of the HMC5883.
  */
-HMC5883L_Raw_t HMC5883L_Get_Raw (HMC5883L_Handle_t *Handle);
+HMC5883L_Status_t HMC5883L_Get_Raw (HMC5883L_Handle_t *Handle);
+
+/**
+ * @brief Read the scaled data at three axis in mg.
+ * @param Handle The pointer of the handle type.
+ * @retval HMC5883L_Status_t The status of the HMC5883.
+ */
+HMC5883L_Status_t HMC5883L_Get_Scaled (HMC5883L_Handle_t *Handle);
 
 /**
  * @brief Initialize the HMC5883L.

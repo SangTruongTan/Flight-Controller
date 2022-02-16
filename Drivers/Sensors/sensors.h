@@ -24,9 +24,9 @@ References:
 /* Private typedef -----------------------------------------------------------*/
 typedef enum Sensor_status_t {
   SENSOR_OK = 0,
-  SENSOR_ERROR_MPU,
-  SENSOR_ERROR_HMC,
-  SENSOR_ERROR_BOTH,
+  SENSOR_ERROR_MPU = 1,
+  SENSOR_ERROR_HMC = 2,
+  SENSOR_ERROR_BOTH = 3,
 } Sensor_status_t;
 
 typedef struct Sensor_handle_t {

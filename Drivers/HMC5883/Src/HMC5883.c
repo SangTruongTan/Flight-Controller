@@ -30,10 +30,23 @@ References:
 HMC5883L_Status_t HMC5883L_Read (HMC5883L_Handle_t *Handle,
                                         uint8_t Address, uint8_t *DataR, uint8_t size){
    HAL_StatusTypeDef status;
-   status = HAL_I2C_Mem_Read(&Handle->hi2c, HMC5883L_ADDRESS << 1, Address, 1,
+   status = HAL_I2C_Mem_Read(&Handle->hi2c, HMC5883L_ADDRESS, Address, 1,
                              DataR, size, 100);
-   if(status != HAL_OK)
-      return HMC5883L_ERROR;
+   if(status != HAL_OK) {
+      switch (status)
+      {
+      case HAL_BUSY:
+         return HMC5883L_BUSY;
+         break;
+      case HAL_TIMEOUT:
+         return HMC5883L_TIMEOUT;
+         break;
+      case HAL_ERROR:
+         return HMC5883L_ERROR;
+      default:
+         break;
+      }
+   }
    return HMC5883L_OK;
 }
 
@@ -48,10 +61,23 @@ HMC5883L_Status_t HMC5883L_Read (HMC5883L_Handle_t *Handle,
 HMC5883L_Status_t HMC5883L_Write (HMC5883L_Handle_t *Handle,
                                          uint8_t Address, uint8_t *DataW, uint8_t size) {
    HAL_StatusTypeDef status;
-   status = HAL_I2C_Mem_Write(&Handle->hi2c, HMC5883L_ADDRESS << 1, Address, 1,
+   status = HAL_I2C_Mem_Write(&Handle->hi2c, HMC5883L_ADDRESS, Address, 1,
                               DataW, size, 100);
-   if(status != HAL_OK)
-      return HMC5883L_ERROR;
+   if(status != HAL_OK) {
+      switch (status)
+      {
+      case HAL_BUSY:
+         return HMC5883L_BUSY;
+         break;
+      case HAL_TIMEOUT:
+         return HMC5883L_TIMEOUT;
+         break;
+      case HAL_ERROR:
+         return HMC5883L_ERROR;
+      default:
+         break;
+      }
+   }
    return HMC5883L_OK;
 }
 
@@ -110,23 +136,45 @@ bool HMC5883L_Check_DRY (HMC5883L_Handle_t *Handle) {
 /**
  * @brief Read the raw data at three axis.
  * @param Handle The pointer of the handle type.
- * @retval HMC5883L_Raw_t The value of the field strength at raw type.
+ * @retval HMC5883L_Status_t The status of the HMC5883.
  */
-HMC5883L_Raw_t HMC5883L_Get_Raw (HMC5883L_Handle_t *Handle) {
-   HMC5883L_Raw_t retval;
-   bool checkDRY = false;
+HMC5883L_Status_t HMC5883L_Get_Raw (HMC5883L_Handle_t *Handle) {
+   HMC5883L_Status_t status;
    uint8_t dataR[6];
-   retval.x = 0;
-   //Read the DRY
-   checkDRY = HMC5883L_Check_DRY(Handle);
    //Read the X, Y, Z register value
-   if(checkDRY == true) {
-      HMC5883L_Read(Handle, HMC5883L_RA_DATAX_H, dataR, 6);
-      retval.x = dataR[0] << 8 | dataR[1];
-      retval.z = dataR[2] << 8 | dataR[3];
-      retval.y = dataR[4] << 8 | dataR[5];
+   status = HMC5883L_Read(Handle, HMC5883L_RA_DATAX_H, dataR, 6);
+   Handle->Status = status;
+   if(status == HMC5883L_OK) {
+      Handle->Raw.x = dataR[0] << 8 | dataR[1];
+      Handle->Raw.z = dataR[2] << 8 | dataR[3];
+      Handle->Raw.y = dataR[4] << 8 | dataR[5];
+      Handle->State = HMC5883L_OK_STATE;
+   } else {
+      Handle->State = HMC5883L_ERROR_STATE;
    }
-   return retval;
+   return status;
+}
+
+/**
+ * @brief Read the scaled data at three axis in mG.
+ * @param Handle The pointer of the handle type.
+ * @retval HMC5883L_Status_t The status of the HMC5883.
+ */
+HMC5883L_Status_t HMC5883L_Get_Scaled (HMC5883L_Handle_t *Handle) {
+   HMC5883L_Status_t status;
+   float Resolution = Handle->Resolution;
+   //Read the raw data
+   status = HMC5883L_Get_Raw(Handle);
+   Handle->Status = status;
+   if(status != HMC5883L_OK) {
+      Handle->State = HMC5883L_ERROR_STATE;
+   } else {
+      Handle->Scaled.x = (float)Handle->Raw.x * Resolution;
+      Handle->Scaled.y = (float)Handle->Raw.y * Resolution;
+      Handle->Scaled.z = (float)Handle->Raw.z * Resolution;
+      Handle->State = HMC5883L_OK_STATE;
+   }
+   return status;
 }
 
 /**
@@ -141,7 +189,7 @@ HMC5883L_State_t HMC5883L_Init (HMC5883L_Handle_t *Handle, I2C_HandleTypeDef *I2
    uint8_t DataR;
    uint8_t DataW;
    //Copy the I2C typedef and the Init struct
-   memcpy(&Handle->hi2c, I2c, sizeof(Handle->hi2c));
+   memcpy(&Handle->hi2c, I2c, sizeof(*I2c));
    //Read the Identify A register
    Status = HMC5883L_Read(Handle, HMC5883L_RA_ID_A, &DataR, 1);
    if (Status != HMC5883L_OK)
