@@ -68,6 +68,7 @@ Sensor_status_t sensors_init (Sensor_handle_t *Handle) {
       if(senStatus != SENSOR_OK) {
         senStatus = SENSOR_ERROR_BOTH;
       }
+      senStatus = SENSOR_ERROR_HMC;
     }
   }
   return senStatus;
@@ -81,9 +82,8 @@ Sensor_status_t sensors_init (Sensor_handle_t *Handle) {
 Sensor_status_t sensors_update (Sensor_handle_t *Handle) {
   //Get the mpu data
   //Get the hmc data
-  HMC5883L_Raw_t hmcRaw;
   if(Handle->enableHMC == true) {
-    hmcRaw = HMC5883L_Get_Raw(&Handle->hmcHandler);
+    Handle->hmcHandler.Raw = HMC5883L_Get_Raw(&Handle->hmcHandler);
   }
   return SENSOR_OK;
 }

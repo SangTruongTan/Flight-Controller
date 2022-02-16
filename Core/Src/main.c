@@ -31,6 +31,7 @@
 #include "semphr.h"
 #include "event_groups.h"
 
+#include "stdio.h"
 //MEMS
 #include "sensors.h"
 /* USER CODE END Includes */
@@ -83,14 +84,7 @@ static void MX_UART5_Init(void);
 static void MX_USART3_UART_Init(void);
 
 /* USER CODE BEGIN PFP */
-#ifdef __GNUC__
-/* With GCC, small printf (option LD Linker->Libraries->Small printf
- set to 'Yes') calls __io_putchar() */
-#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
-#else
-#define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
-#endif /* __GNUC__ */
-
+int _write(int file, char *outgoing, int len);
 void Default_task (void *pvParameters);
 
 /* USER CODE END PFP */
@@ -137,7 +131,7 @@ int main(void)
   MX_UART5_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
-  xTaskCreate(&Default_task, "Default", 256, NULL, 1, &DefaultTask);
+  xTaskCreate(&Default_task, "Default", 512, NULL, 1, &DefaultTask);
 
   //Start Scheduler
   vTaskStartScheduler();
@@ -537,27 +531,28 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-PUTCHAR_PROTOTYPE {
-	/* Place your implementation of fputc here */
-	/* e.g. write a character to the USART3 and Loop until the end of transmission */
-	HAL_UART_Transmit(&huart1, (uint8_t*) &ch, 1, 0xFFFF);
-
-	return ch;
+int _write(int file, char *outgoing, int len) {
+   HAL_UART_Transmit(&huart1,(uint8_t *) outgoing, len, 100);
+   return len;
 }
 
 void Default_task (void *pvParameters) {
-  sensors.hmchi2c = &hi2c1;
+  sensors.hmchi2c = &hi2c2;
   sensors.mpuhi2c = &hi2c1;
-  uint8_t dataR;
-  static HAL_StatusTypeDef status;
-  // sensors_init(&sensors);
+  Sensor_status_t sensorStatus = sensors_init(&sensors);
+  printf("Status Sensor: %d\r\n", sensorStatus);
   TickType_t xTimerStart = xTaskGetTickCount();
   for(;;) {
     HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
     HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
-    // sensors_update(&sensors);
-    status = HAL_I2C_Mem_Read(&hi2c1, MPU6050_Adress, MPU6050_PWR_MGMT_1_REG, 1, &dataR, 1, 100);
-    vTaskDelayUntil(&xTimerStart, 500);
+    sensors_update(&sensors);
+    HMC5883L_Raw_t Raw = sensors.hmcHandler.Raw;
+    if(sensors.hmcHandler.State == HMC5883L_OK_STATE) {
+      printf("DataX:%d, DataY:%d, DataZ:%d\r\n", Raw.x, Raw.y, Raw.z);
+    } else {
+      printf("Error status:%d\r\n", sensors.hmcHandler.Status);
+    }
+    vTaskDelayUntil(&xTimerStart, 100);
   }
 }
 /* USER CODE END 4 */
