@@ -8,7 +8,9 @@
                 "${workspaceFolder}/Core/Inc",
                 "${workspaceFolder}/Drivers/Sensors",
                 "${workspaceFolder}/Drivers/MPU6050",
-                "${workspaceFolder}/Drivers/STM32F4xx_HAL_Driver/Inc"
+                "${workspaceFolder}/Drivers/STM32F4xx_HAL_Driver/Inc",
+                "${workspaceFolder}/Drivers/CMSIS/Device/ST/STM32F4xx/Include",
+                "${workspaceFolder}/Drivers/HMC5883/Inc"
             ],
             "defines": [
                 "_DEBUG",

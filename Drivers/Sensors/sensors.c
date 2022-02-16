@@ -17,31 +17,73 @@ References:
 #include "sensors.h"
 
 /* Private variables ---------------------------------------------------------*/
-struct sensor_handle_t senHandler;
 
 /* Function definations ------------------------------------------------------*/
 /**
+ * @brief This function for user modify the initializations.
+ * @param Handle The pointer of the handle type's sensor.
+ * @param void
+ */
+void sensors_user_modify (Sensor_handle_t *Handle) {
+  /* USER CODE BEGIN */
+  //Enable the sensors
+  Handle->enableHMC = true;
+  Handle->enableMPU = false;
+  //Init for the MPU
+  Handle->mpuHandler.Init.ui8AcceFullScale = MPU6050_ACCE_FULLSCALE_2G;
+  Handle->mpuHandler.Init.ui8GyroFullScale = MPU6050_GYRO_FULLSCALE_500DPS;
+  Handle->mpuHandler.Init.ui8DLPF = MPU6050_DLPF_4;
+  //Init for the HMC
+  Handle->hmcHandler.Init.Average = HMC5883L_AVERAGING_8;
+  Handle->hmcHandler.Init.Bias = HMC5883L_BIAS_NORMAL;
+  Handle->hmcHandler.Init.Gain = HMC5883L_GAIN_1090;
+  Handle->hmcHandler.Init.Mode = HMC5883L_MODE_CONTINUOUS;
+  Handle->hmcHandler.Init.OutputRate = HMC5883L_RATE_75;
+  /* USER CODE END */
+}
+
+/**
   * @brief  Initialize sensors.
-  * @param init the initial condition for sensors.
-  * @retval sensor_handle_t
+  * @param Handle The pointer of the handle type's sensor.
+  * @retval Sensor_status_t
   */
-sensor_handle_t sensors_init (sensor_handle_t init) {
-    //Init the mpu sensor
-    senHandler.mpuHandler = init.mpuHandler;
-    senHandler.enableMPU = init.enableMPU;
-    if (senHandler.enableMPU == true) {
-      MPU6050_Init(senHandler.mpuHandler.Init, senHandler.mpuHandler.hi2c);
+Sensor_status_t sensors_init (Sensor_handle_t *Handle) {
+  //Declare the variables
+  Sensor_status_t senStatus = SENSOR_OK;
+  MPU6050_State mpuState;
+  HMC5883L_State_t hmcState;
+  //Init the sensors
+  sensors_user_modify(Handle);
+  //Call the mpu init function
+  if(Handle->enableMPU == true) {
+    mpuState = MPU6050_Init(Handle->mpuHandler.Init, Handle->mpuhi2c);
+    if(mpuState != MPU6050_OK) {
+      senStatus = SENSOR_ERROR_MPU;
     }
-    return senHandler;
+  }
+  //Call the hmc init function
+  if(Handle->enableHMC == true) {
+    hmcState = HMC5883L_Init(&Handle->hmcHandler, Handle->hmchi2c);
+    if(hmcState != HMC5883L_OK_STATE) {
+      if(senStatus != SENSOR_OK) {
+        senStatus = SENSOR_ERROR_BOTH;
+      }
+    }
+  }
+  return senStatus;
 }
 
 /**
   * @brief  Update sensors data. Must be call as interval with the dt value.
-  * @retval sensor_handle_t
+  * @param Handle The pointer of the handle type's sensor.
+  * @retval Sensor_status_t
   */
-sensor_handle_t sensors_update (void) {
-    if (senHandler.enableMPU == true) {
-      senHandler.mpuHandler = MPU6050_read_mpu_data();
-    }
-    return senHandler;
+Sensor_status_t sensors_update (Sensor_handle_t *Handle) {
+  //Get the mpu data
+  //Get the hmc data
+  HMC5883L_Raw_t hmcRaw;
+  if(Handle->enableHMC == true) {
+    hmcRaw = HMC5883L_Get_Raw(&Handle->hmcHandler);
+  }
+  return SENSOR_OK;
 }

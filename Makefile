@@ -74,7 +74,8 @@ Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_ll_adc.c \
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_i2c.c \
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_i2c_ex.c \
 Drivers/MPU6050/Src/ST_MPU6050.c \
-Drivers/Sensors/sensors.c
+Drivers/Sensors/sensors.c \
+Drivers/HMC5883/Src/HMC5883.c
 # ASM sources
 ASM_SOURCES =  \
 startup_stm32f405xx.s
@@ -139,7 +140,8 @@ C_INCLUDES =  \
 -IDrivers/CMSIS/Device/ST/STM32F4xx/Include \
 -IDrivers/CMSIS/Include \
 -IDrivers/MPU6050/Inc \
--IDrivers/Sensors
+-IDrivers/Sensors \
+-IDrivers/HMC5883/Inc
 
 # compile gcc flags
 ASFLAGS = $(MCU) $(AS_DEFS) $(AS_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections

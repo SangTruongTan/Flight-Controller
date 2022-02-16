@@ -13,29 +13,51 @@ References:
    or indirectly by this software, read more about this on the GNU General Public License.
 */
 
-#ifndef SENSORS_H__
-#define SENSORS_H__
+#ifndef _SENSORS_H__
+#define _SENSORS_H__
 
 /* Private includes ----------------------------------------------------------*/
 #include "main.h"
 #include "ST_MPU6050.h"
+#include "HMC5883.h"
 
 /* Private typedef -----------------------------------------------------------*/
-typedef struct sensor_handle_t {
+typedef enum Sensor_status_t {
+  SENSOR_OK = 0,
+  SENSOR_ERROR_MPU,
+  SENSOR_ERROR_HMC,
+  SENSOR_ERROR_BOTH,
+} Sensor_status_t;
+
+typedef struct Sensor_handle_t {
     MPU6050_handle_t mpuHandler;
+    HMC5883L_Handle_t hmcHandler;
+    I2C_HandleTypeDef *mpuhi2c;
+    I2C_HandleTypeDef *hmchi2c;
+    bool enableHMC;
     bool enableMPU;
-} sensor_handle_t;
+} Sensor_handle_t;
 
 /* Private function prototypes -----------------------------------------------*/
 /**
+ * @brief This function for user modify the initializations.
+ * @param Handle The pointer of the handle type's sensor.
+ * @param void
+ */
+void sensors_user_modify (Sensor_handle_t *Handle);
+
+/**
   * @brief  Initialize sensors.
-  * @param init the initial condition for sensors.
-  * @retval sensor_handle_t
+  * @param Handle The pointer of the handle type's sensor.
+  * @retval Sensor_status_t
   */
-sensor_handle_t sensors_init (sensor_handle_t init);
+Sensor_status_t sensors_init (Sensor_handle_t *Handle);
+
 /**
   * @brief  Update sensors data. Must be call as interval with the dt value.
-  * @retval sensor_handle_t
+  * @param Handle The pointer of the handle type's sensor.
+  * @retval Sensor_status_t
   */
-sensor_handle_t sensors_update (void);
-#endif
+Sensor_status_t sensors_update (Sensor_handle_t *Handle);
+
+#endif    /* End of File */

@@ -67,7 +67,7 @@ uint8_t count = 0;
 
 TaskHandle_t DefaultTask;
 
-sensor_handle_t SensorData;
+Sensor_handle_t sensors;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -546,18 +546,17 @@ PUTCHAR_PROTOTYPE {
 }
 
 void Default_task (void *pvParameters) {
-  sensor_handle_t sensors;
-  sensors.enableMPU =  true;
-  sensors.mpuHandler.hi2c = &hi2c1;
-  sensors.mpuHandler.Init.ui8AcceFullScale = MPU6050_ACCE_FULLSCALE_2G;
-  sensors.mpuHandler.Init.ui8DLPF = MPU6050_DLPF_4;
-  sensors.mpuHandler.Init.ui8GyroFullScale = MPU6050_GYRO_FULLSCALE_500DPS;
-  sensors_init(sensors);
+  sensors.hmchi2c = &hi2c1;
+  sensors.mpuhi2c = &hi2c1;
+  uint8_t dataR;
+  static HAL_StatusTypeDef status;
+  // sensors_init(&sensors);
   TickType_t xTimerStart = xTaskGetTickCount();
   for(;;) {
     HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
     HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
-    SensorData = sensors_update();
+    // sensors_update(&sensors);
+    status = HAL_I2C_Mem_Read(&hi2c1, MPU6050_Adress, MPU6050_PWR_MGMT_1_REG, 1, &dataR, 1, 100);
     vTaskDelayUntil(&xTimerStart, 500);
   }
 }
