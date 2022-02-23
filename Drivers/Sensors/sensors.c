@@ -28,7 +28,7 @@ void sensors_user_modify (Sensor_handle_t *Handle) {
   /* USER CODE BEGIN */
   //Enable the sensors
   Handle->enableHMC = true;
-  Handle->enableMPU = false;
+  Handle->enableMPU = true;
   //Init for the MPU
   Handle->mpuHandler.Init.ui8AcceFullScale = MPU6050_ACCE_FULLSCALE_2G;
   Handle->mpuHandler.Init.ui8GyroFullScale = MPU6050_GYRO_FULLSCALE_500DPS;
@@ -48,33 +48,28 @@ void sensors_user_modify (Sensor_handle_t *Handle) {
   * @retval Sensor_status_t
   */
 Sensor_status_t sensors_init (Sensor_handle_t *Handle) {
-  //Declare the variables
-  Sensor_status_t senStatus = SENSOR_OK;
-  MPU6050_State mpuState;
+  //Initialize
+  Sensor_status_t *SenStatus =  &Handle->status;
+  *SenStatus = SENSOR_OK;
+  MPU6050_State_t mpuState;
   HMC5883L_State_t hmcState;
   //Init the sensors
   sensors_user_modify(Handle);
   //Call the mpu init function
   if(Handle->enableMPU == true) {
-    mpuState = MPU6050_Init(Handle->mpuHandler.Init, Handle->mpuhi2c);
-    if(mpuState != MPU6050_OK) {
-      senStatus = SENSOR_ERROR_MPU;
+    mpuState = MPU6050_Init(&Handle->mpuHandler, Handle->mpuhi2c);
+    if(mpuState != MPU6050_OK_STATE) {
+      *SenStatus |= SENSOR_ERROR_MPU;
     }
   }
   //Call the hmc init function
   if(Handle->enableHMC == true) {
     hmcState = HMC5883L_Init(&Handle->hmcHandler, Handle->hmchi2c);
-    Handle->hmcHandler.State = hmcState;
     if(hmcState != HMC5883L_OK_STATE) {
-      if(senStatus != SENSOR_OK) {
-        senStatus = SENSOR_ERROR_BOTH;
-      } else {
-        senStatus = SENSOR_ERROR_HMC;
-      }
-      senStatus = SENSOR_ERROR_HMC;
+      *SenStatus |= SENSOR_ERROR_MPU;
     }
   }
-  return senStatus;
+  return *SenStatus;
 }
 
 /**
@@ -83,12 +78,21 @@ Sensor_status_t sensors_init (Sensor_handle_t *Handle) {
   * @retval Sensor_status_t
   */
 Sensor_status_t sensors_update (Sensor_handle_t *Handle) {
+  //Initialize
+  Sensor_status_t *SenStatus =  &Handle->status;
+  *SenStatus = SENSOR_OK;
   //Get the mpu data
+  if(Handle->enableMPU == true) {
+    MPU6050_State_t State = MPU6050_read_mpu_data(&Handle->mpuHandler);
+    if(State != MPU6050_OK_STATE) {
+      *SenStatus |= SENSOR_ERROR_MPU;
+    }
+  }
   //Get the hmc data
   if(Handle->enableHMC == true) {
     HMC5883L_Status_t status = HMC5883L_Get_Scaled(&Handle->hmcHandler);
     if(status  != HMC5883L_OK)
-      return SENSOR_ERROR_HMC;
+      *SenStatus |= SENSOR_ERROR_HMC;
   }
   return SENSOR_OK;
 }

@@ -37,7 +37,7 @@ References:
 #define G_VALUE 9.80665f
 
 /* I2C device address */
-#define      MPU6050_Adress  ((uint8_t)0x68<<1)
+#define      MPU6050_Address  ((uint8_t)0x68<<1)
 
 /* List of Register */
 #define     MPU6050_SMPLRT_DIV_REG                      0x19
@@ -110,17 +110,24 @@ References:
 #define     MPU6050_ACCE_SENSI_4G                       8192.0f               /* Accelerometer sensitivity 8192 LSB/g for +-4g range */
 #define     MPU6050_ACCE_SENSI_8G                       4096.0f               /* Accelerometer sensitivity 4096 LSB/g for +-8g range */
 #define     MPU6050_ACCE_SENSI_16G                      2048.0f               /* Accelerometer sensitivity 2048 LSB/g for +-16g range */
- 
+
 
 /******************** Typedefs ********************/
-// State of IMU
-typedef enum MPU6050_State {
+//Status of the IMU
+typedef enum MPU6050_Status_t {
     MPU6050_OK = 0,
-    MPU6050_ID_ERROR,
-    MPU6050_ACCE_FULLSCALED_ERROR,
-    MPU6050_GYRO_FULLSCALED_ERROR,
-
-}MPU6050_State;
+    MPU6050_ERROR = 1,
+    MPU6050_BUSY = 2,
+    MPU6050_TIMEOUT = 3,
+}MPU6050_Status_t;
+// State of IMU
+typedef enum MPU6050_State_t {
+    MPU6050_OK_STATE = 0,
+    MPU6050_ERROR_STATE = 1,
+    MPU6050_ID_ERROR_STATE = 2,
+    MPU6050_ACCE_FULLSCALED_ERROR_STATE = 3,
+    MPU6050_GYRO_FULLSCALED_ERROR_STATE = 4,
+}MPU6050_State_t;
 
 //Initialize Typedef
 typedef struct MPU6050_InitTypedef {
@@ -171,39 +178,44 @@ typedef struct MPU6050_GyroAxis {
 
 //Handle Typedef of the IMU
 typedef struct MPU6050_handle_t {
-    I2C_HandleTypeDef *hi2c;
-    MPU6050_State *State;
+    I2C_HandleTypeDef hi2c;
+    MPU6050_State_t State;
+    MPU6050_Status_t Status;
     MPU6050_InitTypedef Init;
-    MPU6050_AcceDataRaw *AccRaw;
-    MPU6050_AcceDataScaled *AccScaled;
-    MPU6050_GyroDataRaw *GyroRaw;
-    MPU6050_GyroDataScaled *GyroScaled;
+    MPU6050_AcceDataRaw AccRaw;
+    MPU6050_AcceDataScaled AccScaled;
+    MPU6050_GyroDataRaw GyroRaw;
+    MPU6050_GyroDataScaled GyroScaled;
+    float AcceSens;
+    float GyroSens;
 } MPU6050_handle_t;
 
 /******************** List of function prototypes *********************/
 //1. Read Register
-    void MPU6050_Read (uint8_t* ui8pDataR, uint8_t ui8Add, uint8_t ui8size);
+MPU6050_Status_t MPU6050_Read (MPU6050_handle_t *Handle, uint8_t* ui8pDataR,
+                    uint8_t ui8Add, uint8_t ui8size);
 //2. Write Register
-    void MPU6050_Write (uint8_t* ui8pDataW, uint8_t ui8Add, uint8_t ui8size);
+MPU6050_Status_t MPU6050_Write (MPU6050_handle_t *Handle, uint8_t* ui8pDataW,
+                    uint8_t ui8Add, uint8_t ui8size);
 //3.  MPU6050 Initialize
-MPU6050_State MPU6050_Init (MPU6050_InitTypedef mpuInit, I2C_HandleTypeDef* i2cHandle);
+MPU6050_State_t MPU6050_Init (MPU6050_handle_t *Handle, I2C_HandleTypeDef *hi2c);
 
 //4.  MPU6050 Accelerometer read data raw
-MPU6050_AcceDataRaw MPU6050_AcceRead_Raw (void);
+MPU6050_State_t MPU6050_AcceRead_Raw (MPU6050_handle_t *Handle);
 
 //5. MPU6050 Accelerometer read data scaled
-MPU6050_AcceDataScaled MPU6050_AcceRead_Scaled (void);
+MPU6050_State_t MPU6050_AcceRead_Scaled (MPU6050_handle_t *Handle);
 
 //6. MPU6050 Gyroscope read data raw
-MPU6050_GyroDataRaw MPU6050_GyroRead_Raw (void);
+MPU6050_State_t MPU6050_GyroRead_Raw (MPU6050_handle_t *Handle);
 
 //7. MPU6050 Gyroscope read data scaled
-MPU6050_GyroDataScaled MPU6050_GyroRead_Scaled (void);
+MPU6050_State_t MPU6050_GyroRead_Scaled (MPU6050_handle_t *Handle);
 
 /**
   * @brief  Read the acceleration and the gyroscope data.
-  * @retval MPU6050_handle_t.
+  * @retval MPU6050_State_t.
   */
-MPU6050_handle_t MPU6050_read_mpu_data (void);
+MPU6050_State_t MPU6050_read_mpu_data (MPU6050_handle_t *Handle);
 
 #endif      /* End of File */

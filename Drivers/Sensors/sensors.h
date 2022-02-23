@@ -23,10 +23,10 @@ References:
 
 /* Private typedef -----------------------------------------------------------*/
 typedef enum Sensor_status_t {
-  SENSOR_OK = 0,
-  SENSOR_ERROR_MPU = 1,
-  SENSOR_ERROR_HMC = 2,
-  SENSOR_ERROR_BOTH = 3,
+  SENSOR_OK = 0U,
+  SENSOR_ERROR_MPU = 0x01U,
+  SENSOR_ERROR_HMC = 0x02U,
+  SENSOR_ERROR_BOTH = 0x03U,
 } Sensor_status_t;
 
 typedef struct Sensor_handle_t {
@@ -36,6 +36,7 @@ typedef struct Sensor_handle_t {
     I2C_HandleTypeDef *hmchi2c;
     bool enableHMC;
     bool enableMPU;
+    Sensor_status_t status;
 } Sensor_handle_t;
 
 /* Private function prototypes -----------------------------------------------*/

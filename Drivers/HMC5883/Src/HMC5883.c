@@ -219,5 +219,6 @@ HMC5883L_State_t HMC5883L_Init (HMC5883L_Handle_t *Handle, I2C_HandleTypeDef *I2
    //Get the Resolution
    Handle->Resolution = HMC5883L_Get_Gain(Handle->Init.Gain);
    //Return value
+   Handle->State = HMC5883L_OK_STATE;
    return HMC5883L_OK_STATE;
 }

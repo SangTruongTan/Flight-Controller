@@ -541,28 +541,20 @@ void Default_task (void *pvParameters) {
   sensors.mpuhi2c = &hi2c1;
   Sensor_status_t sensorStatus = sensors_init(&sensors);
   printf("Status Sensor: %d\r\n", sensorStatus);
-  printf("HMC State:%d\r\n", sensors.hmcHandler.State);
   TickType_t xTimerStart = xTaskGetTickCount();
   for(;;) {
-    if(sensors.hmcHandler.State ==  HMC5883L_OK_STATE) {
-      HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
-      HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
-      sensors_update(&sensors);
-      HMC5883L_Raw_t Raw = sensors.hmcHandler.Raw;
-      HMC5883L_Scaled_t Scaled = sensors.hmcHandler.Scaled;
-      if(sensors.hmcHandler.State == HMC5883L_OK_STATE) {
-        printf("DataX:%d, DataY:%d, DataZ:%d\r\n", Raw.x, Raw.y, Raw.z);
-        printf("Data Scaled X: %fmG, Y: %fmG, Z: %fmG\r\n", Scaled.x, Scaled.y, Scaled.z);
-      } else {
-        printf("Error status:%d\r\n", sensors.hmcHandler.Status);
-      }
+    Sensor_status_t SenStatus = sensors_update(&sensors);
+    if(SenStatus ==  SENSOR_OK) {
+      MPU6050_AcceDataScaled Acce = sensors.mpuHandler.AccScaled;
+      MPU6050_GyroDataScaled Gyro = sensors.mpuHandler.GyroScaled;
+      HMC5883L_Scaled_t Hmc = sensors.hmcHandler.Scaled;
+      printf("Accelerometer: X=%f, Y=%f, Z=%f\r\n", Acce.x, Acce.y, Acce.z);
+      printf("Gyroscope: X=%f, Y=%f, Z=%f\r\n", Gyro.x, Gyro.y, Gyro.z);
+      printf("Magnetometer: X= %f, Y=%f, Z=%f\r\n\r\n\r\n", Hmc.x, Hmc.y, Hmc.z);
     } else {
-      sensors_update(&sensors);
-      printf("Error status:%d\r\n", sensors.hmcHandler.Status);
-      HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
-      HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin | LED2_Pin, GPIO_PIN_SET);
+      printf("Detected error with error_code:%d\r\n", sensors.status);
     }
-    vTaskDelayUntil(&xTimerStart, 100);
+    vTaskDelayUntil(&xTimerStart, 1000);
   }
 }
 /* USER CODE END 4 */

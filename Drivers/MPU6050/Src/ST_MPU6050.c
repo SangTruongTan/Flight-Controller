@@ -24,191 +24,272 @@ References:
 
 
 /********************* Global Variable *********************/
-float Mpu6050_AcceSensi = MPU6050_ACCE_SENSI_2G;
 
-float Mpu6050_GyroSensi = MPU6050_GYRO_SENSI_250DPS;
-
-I2C_HandleTypeDef mpuhi2c;
-
-static MPU6050_State State;
-static MPU6050_AcceDataRaw AccRaw;
-static MPU6050_AcceDataScaled AccScaled;
-static MPU6050_GyroDataRaw GyroRaw;
-static MPU6050_GyroDataScaled GyroScaled;
-
-MPU6050_handle_t mpuHandle;
 /******************** Function Definitions *********************/
 
 //1. Read Register
-void MPU6050_Read (uint8_t* ui8pDataR, uint8_t ui8Add, uint8_t ui8size)
-{
-     HAL_I2C_Mem_Read(&mpuhi2c, MPU6050_Adress, ui8Add, 1, ui8pDataR, ui8size, 10);
+MPU6050_Status_t MPU6050_Read (MPU6050_handle_t *Handle, uint8_t* ui8pDataR,
+                    uint8_t ui8Add, uint8_t ui8size) {
+    HAL_StatusTypeDef status =  HAL_I2C_Mem_Read(&Handle->hi2c, MPU6050_Address,
+                                ui8Add, 1, ui8pDataR, ui8size, 10);
+    if(status != HAL_OK) {
+        switch (status) {
+        case HAL_ERROR:
+            return MPU6050_ERROR;
+            break;
+        case HAL_BUSY:
+            return MPU6050_BUSY;
+            break;
+        case HAL_TIMEOUT:
+            return MPU6050_TIMEOUT;
+            break;
+        default:
+            break;
+        }
+    }
+    return MPU6050_OK;
 }
 
 //2. Write Register
-void MPU6050_Write (uint8_t* ui8pDataW, uint8_t ui8Add, uint8_t ui8size)
-{
-    HAL_I2C_Mem_Write(&mpuhi2c, MPU6050_Adress, ui8Add, 1, ui8pDataW, ui8size, 10);
+MPU6050_Status_t MPU6050_Write (MPU6050_handle_t *Handle, uint8_t* ui8pDataW,
+                    uint8_t ui8Add, uint8_t ui8size) {
+    HAL_StatusTypeDef status = HAL_I2C_Mem_Write(&Handle->hi2c, MPU6050_Address,
+                               ui8Add, 1, ui8pDataW, ui8size, 10);
+    if(status != HAL_OK) {
+        switch (status) {
+        case HAL_ERROR:
+            return MPU6050_ERROR;
+            break;
+        case HAL_BUSY:
+            return MPU6050_BUSY;
+            break;
+        case HAL_TIMEOUT:
+            return MPU6050_TIMEOUT;
+            break;
+        default:
+            break;
+        }
+    }
+    return MPU6050_OK;
 }
-//3. MPU6050 Initialize
-
-MPU6050_State MPU6050_Init (MPU6050_InitTypedef mpuInitTypeDef, I2C_HandleTypeDef* i2cHandle)
-{
+//3.  MPU6050 Initialize
+MPU6050_State_t MPU6050_Init (MPU6050_handle_t *Handle, I2C_HandleTypeDef *hi2c) {
     uint8_t ui8buffer;
+    HAL_StatusTypeDef Status;
     uint32_t i=0;
+    MPU6050_InitTypedef mpuInitTypeDef = Handle->Init;
+    float *Mpu6050_AcceSensi = &Handle->AcceSens;
+    float *Mpu6050_GyroSensi = &Handle->GyroSens;
     //I2c Handle Typedef
-    memcpy(&mpuhi2c, i2cHandle, sizeof(*i2cHandle));
-    mpuHandle.Init = mpuInitTypeDef;
-    mpuHandle.State = &State;
-    mpuHandle.hi2c = &mpuhi2c;
-    mpuHandle.AccRaw = &AccRaw;
-    mpuHandle.AccScaled = &AccScaled;
-    mpuHandle.GyroRaw = &GyroRaw;
-    mpuHandle.GyroScaled = &GyroScaled;
+    memcpy(&Handle->hi2c, hi2c, sizeof(*hi2c));
     //Read Who AM I Register
-    MPU6050_Read(&ui8buffer, MPU6050_WHO_AM_I_REG, 1);
-    if (ui8buffer != 0x68)
-        return MPU6050_ID_ERROR;
+    Status = MPU6050_Read(Handle, &ui8buffer, MPU6050_WHO_AM_I_REG, 1);
+    Handle->Status = Status;
+    if(Status != MPU6050_OK) {
+        Handle->State = MPU6050_ERROR_STATE;
+        return MPU6050_ERROR_STATE;
+    }
+    if (ui8buffer != 0x68) {
+        Handle->State = MPU6050_ID_ERROR_STATE;
+        return MPU6050_ID_ERROR_STATE;
+    }
     //Reset IMU
-    MPU6050_Read(&ui8buffer, MPU6050_PWR_MGMT_1_REG, 1);
+    Status = MPU6050_Read(Handle, &ui8buffer, MPU6050_PWR_MGMT_1_REG, 1);
+    Handle->Status = Status;
+    if(Status != MPU6050_OK) {
+        Handle->State = MPU6050_ERROR_STATE;
+        return MPU6050_ERROR_STATE;
+    }
     ui8buffer |= 0x80;
-    MPU6050_Write(&ui8buffer, MPU6050_PWR_MGMT_1_REG, 1);
+    Status = MPU6050_Write(Handle, &ui8buffer, MPU6050_PWR_MGMT_1_REG, 1);
+    Handle->Status = Status;
+    if(Status != MPU6050_OK) {
+        Handle->State = MPU6050_ERROR_STATE;
+        return MPU6050_ERROR_STATE;
+    }
     for(i = 0; i < 2400000; i++)
     {
     	asm("NOP");
     }
 
     ui8buffer = 0x08;           //Enable IMU
-    MPU6050_Write(&ui8buffer, MPU6050_PWR_MGMT_1_REG, 1);
+    Status = MPU6050_Write(Handle, &ui8buffer, MPU6050_PWR_MGMT_1_REG, 1);
+    Handle->Status = Status;
+    if(Status != MPU6050_OK) {
+        Handle->State = MPU6050_ERROR_STATE;
+        return MPU6050_ERROR_STATE;
+    }
     //Setting Accelerometer full scale range
     ui8buffer = 0x00;
     ui8buffer |= mpuInitTypeDef.ui8AcceFullScale;
-    MPU6050_Write(&ui8buffer, MPU6050_ACCEL_CONFIG_REG, 1);
-
+    Status = MPU6050_Write(Handle, &ui8buffer, MPU6050_ACCEL_CONFIG_REG, 1);
+    Handle->Status = Status;
+    if(Status != MPU6050_OK) {
+        Handle->State = MPU6050_ERROR_STATE;
+        return MPU6050_ERROR_STATE;
+    }
     //Setting Gyroscope full scale range
     ui8buffer = 0x00;
     ui8buffer |= mpuInitTypeDef.ui8GyroFullScale;
-    MPU6050_Write(&ui8buffer, MPU6050_GYRO_CONFIG_REG, 1);
-
+    Status = MPU6050_Write(Handle, &ui8buffer, MPU6050_GYRO_CONFIG_REG, 1);
+    Handle->Status = Status;
+    if(Status != MPU6050_OK) {
+        Handle->State = MPU6050_ERROR_STATE;
+        return MPU6050_ERROR_STATE;
+    }
     //Setting Digital Low Pass Filter
     ui8buffer = 0x00;
     ui8buffer |= mpuInitTypeDef.ui8DLPF;
-    MPU6050_Write(&ui8buffer, MPU6050_CONFIG_REG, 1);
-
+    Status = MPU6050_Write(Handle, &ui8buffer, MPU6050_CONFIG_REG, 1);
+    Handle->Status = Status;
+    if(Status != MPU6050_OK) {
+        Handle->State = MPU6050_ERROR_STATE;
+        return MPU6050_ERROR_STATE;
+    }
     //Setting sensitivity for Accelerometer
     switch (mpuInitTypeDef.ui8AcceFullScale)
     {
         case MPU6050_ACCE_FULLSCALE_2G:
-            Mpu6050_AcceSensi = MPU6050_ACCE_SENSI_2G;
+            *Mpu6050_AcceSensi = MPU6050_ACCE_SENSI_2G;
             break;
         case MPU6050_ACCE_FULLSCALE_4G:
-            Mpu6050_AcceSensi = MPU6050_ACCE_SENSI_4G;
+            *Mpu6050_AcceSensi = MPU6050_ACCE_SENSI_4G;
             break;
         case MPU6050_ACCE_FULLSCALE_8G:
-            Mpu6050_AcceSensi = MPU6050_ACCE_SENSI_8G;
+            *Mpu6050_AcceSensi = MPU6050_ACCE_SENSI_8G;
             break;
         case MPU6050_ACCE_FULLSCALE_16G:
-            Mpu6050_AcceSensi = MPU6050_ACCE_SENSI_16G;
+            *Mpu6050_AcceSensi = MPU6050_ACCE_SENSI_16G;
             break;
         default:
-            return MPU6050_ACCE_FULLSCALED_ERROR;
+            Handle->State = MPU6050_ACCE_FULLSCALED_ERROR_STATE;
+            return MPU6050_ACCE_FULLSCALED_ERROR_STATE;
+            break;
     }
 
     switch (mpuInitTypeDef.ui8GyroFullScale)
     {
         case MPU6050_GYRO_FULLSCALE_250DPS:
-            Mpu6050_GyroSensi = MPU6050_GYRO_SENSI_250DPS;
+            *Mpu6050_GyroSensi = MPU6050_GYRO_SENSI_250DPS;
             break;
         case MPU6050_GYRO_FULLSCALE_500DPS:
-            Mpu6050_GyroSensi = MPU6050_GYRO_SENSI_500DPS;
+            *Mpu6050_GyroSensi = MPU6050_GYRO_SENSI_500DPS;
             break;
         case MPU6050_GYRO_FULLSCALE_1000DPS:
-            Mpu6050_GyroSensi = MPU6050_GYRO_SENSI_1000DPS;
+            *Mpu6050_GyroSensi = MPU6050_GYRO_SENSI_1000DPS;
             break;
         case MPU6050_GYRO_FULLSCALE_2000DPS:
-            Mpu6050_GyroSensi = MPU6050_GYRO_SENSI_2000DPS;
+            *Mpu6050_GyroSensi = MPU6050_GYRO_SENSI_2000DPS;
             break;
         default:
-            return MPU6050_GYRO_FULLSCALED_ERROR;
+            Handle->State = MPU6050_GYRO_FULLSCALED_ERROR_STATE;
+            return MPU6050_GYRO_FULLSCALED_ERROR_STATE;
+            break;
     }
-    return MPU6050_OK;
-
+    Handle -> State = MPU6050_OK_STATE;
+    return MPU6050_OK_STATE;
 }
 
 //4 . MPU6050 Accelerometer read data raw
-MPU6050_AcceDataRaw MPU6050_AcceRead_Raw (void)
-{
-    uint8_t ui8Buffer[2];
+MPU6050_State_t MPU6050_AcceRead_Raw (MPU6050_handle_t *Handle) {
+    uint8_t ui8Buffer[6];
     MPU6050_AcceDataRaw acRaw;
-
-    // Read X value
-    MPU6050_Read(ui8Buffer, MPU6050_ACCEL_XOUT_H_REG, 2);
-    acRaw.x = ui8Buffer[0] << 8 | ui8Buffer[1];
-    // Read Y value
-    MPU6050_Read(ui8Buffer, MPU6050_ACCEL_YOUT_H_REG, 2);
-    acRaw.y = ui8Buffer[0] << 8 | ui8Buffer[1];
-    // Read Z value
-    MPU6050_Read(ui8Buffer, MPU6050_ACCEL_ZOUT_H_REG, 2);
-    acRaw.z = ui8Buffer[0] << 8 | ui8Buffer[1];
-    return acRaw;
+    MPU6050_State_t State = MPU6050_OK;
+    MPU6050_Status_t Status = MPU6050_OK;
+    // Read X, Y, Z value
+    Status = MPU6050_Read(Handle, ui8Buffer, MPU6050_ACCEL_XOUT_H_REG, 6);
+    Handle->Status = Status;
+    if(Status != MPU6050_OK) {
+        Handle->State = MPU6050_ERROR_STATE;
+        return MPU6050_ERROR_STATE;
     }
+    acRaw.x = ui8Buffer[0] << 8 | ui8Buffer[1];
+    acRaw.y = ui8Buffer[2] << 8 | ui8Buffer[3];
+    acRaw.z = ui8Buffer[4] << 8 | ui8Buffer[5];
+    Handle->AccRaw = acRaw;
+    Handle->State = MPU6050_OK_STATE;
+    return MPU6050_OK_STATE;
+}
 
 //5. MPU6050 Accelerometer read data scaled
 /**
-  * @brief  Read the scaled data from MPU.
-  * @retval MPU6050_AcceDataScaled The data using m/s^2 unit.
+  * @brief  Read the scaled data from MPU. The data using m/s^2 unit.
+  * @retval MPU6050_State_t The state of the imu.
   */
-MPU6050_AcceDataScaled MPU6050_AcceRead_Scaled (void)
-{
+MPU6050_State_t MPU6050_AcceRead_Scaled (MPU6050_handle_t *Handle) {
     MPU6050_AcceDataRaw mpuRaw;
     MPU6050_AcceDataScaled mpuScaled;
-    mpuRaw = MPU6050_AcceRead_Raw();
-    mpuScaled.x = mpuRaw.x/Mpu6050_AcceSensi*G_VALUE;
-    mpuScaled.y = mpuRaw.y/Mpu6050_AcceSensi*G_VALUE;
-    mpuScaled.z = mpuRaw.z/Mpu6050_AcceSensi*G_VALUE;
-    return mpuScaled;
+    float Mpu6050_AcceSensi = Handle->AcceSens;
+    MPU6050_Status_t Status =  MPU6050_AcceRead_Raw(Handle);
+    Handle->Status = Status;
+    if(Status != MPU6050_OK) {
+        Handle->State = MPU6050_ERROR_STATE;
+        return MPU6050_ERROR_STATE;
     }
+    mpuRaw = Handle->AccRaw;
+    mpuScaled.x =(float) mpuRaw.x/Mpu6050_AcceSensi*G_VALUE;
+    mpuScaled.y =(float) mpuRaw.y/Mpu6050_AcceSensi*G_VALUE;
+    mpuScaled.z =(float) mpuRaw.z/Mpu6050_AcceSensi*G_VALUE;
+    Handle->AccScaled = mpuScaled;
+    return MPU6050_OK_STATE;
+}
 
 //6. MPU6050 Gyroscope read data raw
-MPU6050_GyroDataRaw MPU6050_GyroRead_Raw (void)
-{
+MPU6050_State_t MPU6050_GyroRead_Raw (MPU6050_handle_t *Handle) {
     MPU6050_GyroDataRaw mpuRaw;
-    uint8_t ui8Buffer[2];
-
-    //Read X value
-    MPU6050_Read(ui8Buffer, MPU6050_GYRO_XOUT_H_REG, 2);
-    mpuRaw.x = ui8Buffer[0] << 8 | ui8Buffer [1];
-    //Read Y value
-    MPU6050_Read(ui8Buffer, MPU6050_GYRO_YOUT_H_REG, 2);
-    mpuRaw.y = ui8Buffer[0] << 8 | ui8Buffer [1];
-    //Read Z value
-    MPU6050_Read(ui8Buffer, MPU6050_GYRO_ZOUT_H_REG, 2);
-    mpuRaw.z = ui8Buffer[0] << 8 | ui8Buffer [1];
-
-    return mpuRaw;
+    uint8_t ui8Buffer[6];
+    MPU6050_Status_t Status;
+    //Read X, Y, Z value
+    Status = MPU6050_Read(Handle, ui8Buffer, MPU6050_GYRO_XOUT_H_REG, 6);
+    Handle->Status = Status;
+    if(Status != MPU6050_OK) {
+        Handle->State = MPU6050_ERROR_STATE;
+        return MPU6050_ERROR_STATE;
     }
+    mpuRaw.x = ui8Buffer[0] << 8 | ui8Buffer[1];
+    mpuRaw.y = ui8Buffer[2] << 8 | ui8Buffer[3];
+    mpuRaw.z = ui8Buffer[4] << 8 | ui8Buffer[5];
+    Handle->GyroRaw = mpuRaw;
+    Handle->State = MPU6050_OK_STATE;
+    return MPU6050_OK_STATE;
+}
 
 //7. MPU6050 Gyroscope read data scaled
-MPU6050_GyroDataScaled MPU6050_GyroRead_Scaled (void)
-{
+MPU6050_State_t MPU6050_GyroRead_Scaled (MPU6050_handle_t *Handle) {
     MPU6050_GyroDataRaw mpuRaw;
     MPU6050_GyroDataScaled mpuScaled;
-    mpuRaw = MPU6050_GyroRead_Raw();
+    float Mpu6050_GyroSensi = Handle->GyroSens;
+    MPU6050_Status_t Status =  MPU6050_GyroRead_Raw(Handle);
+    Handle->Status = Status;
+    if(Status != MPU6050_OK) {
+        Handle->State = MPU6050_ERROR_STATE;
+        return MPU6050_ERROR_STATE;
+    }
+    mpuRaw = Handle->GyroRaw;
     mpuScaled.x =(float) mpuRaw.x/Mpu6050_GyroSensi;
     mpuScaled.y =(float) mpuRaw.y/Mpu6050_GyroSensi;
     mpuScaled.z =(float) mpuRaw.z/Mpu6050_GyroSensi;
-
-    return mpuScaled;
-    }
+    Handle->GyroScaled = mpuScaled;
+    return MPU6050_OK_STATE;
+}
 
 /**
   * @brief  Read the acceleration and the gyroscope data.
-  * @retval MPU6050_handle_t.
+  * @retval MPU6050_State_t.
   */
-MPU6050_handle_t MPU6050_read_mpu_data (void) {
-    *(mpuHandle.AccScaled) = MPU6050_AcceRead_Scaled();
-    *(mpuHandle.GyroScaled) = MPU6050_GyroRead_Scaled();
-    return mpuHandle;
+MPU6050_State_t MPU6050_read_mpu_data (MPU6050_handle_t *Handle) {
+    MPU6050_State_t State;
+    State = MPU6050_AcceRead_Scaled(Handle);
+    Handle->State = State;
+    if(State != MPU6050_OK_STATE) {
+        return MPU6050_ERROR_STATE;
+    }
+    State = MPU6050_GyroRead_Scaled(Handle);
+    Handle->State = State;
+    if(State != MPU6050_OK_STATE) {
+        return MPU6050_ERROR_STATE;
+    }
+    return MPU6050_OK_STATE;
 }
-                                                                /** Copyright (C) 2021 - TTSang **/
 
+/** Copyright (C) 2021 - TTSang **/
