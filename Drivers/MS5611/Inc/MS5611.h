@@ -28,7 +28,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 #include "main.h"
-
+#include "math.h"
+#include "stdbool.h"
 /* Exported types ------------------------------------------------------------*/
 typedef enum MS5611_Osr_t {
     MS5611_ULTRA_HIGH_RES = 0x08,
@@ -56,6 +57,7 @@ typedef struct MS5611_PROM_t {
 
 typedef struct MS5611_Temp_t {
     uint32_t Raw;
+    int16_t dT;
     float Degree;
 } MS5611_Temp_t;
 
@@ -71,14 +73,26 @@ typedef struct MS5611_Handle_t {
     MS5611_Temp_t Temp;
     MS5611_Press_t Pressure;
     float Altitude;
+    MS5611_PROM_t PROM;
+    uint32_t ADC_Value;
 } MS5611_Handle_t;
+
 /* Exported constants --------------------------------------------------------*/
 
 /* Exported macro ------------------------------------------------------------*/
 
 /* Exported functions prototypes ---------------------------------------------*/
-MS5611_Status_t MS5611_Write (MS5611_Handle_t *Handle, uint8_t Command);
-MS5611_Read(MS5611_Handle_t *Handle, uint8_t *DataR, uint8_t Size);
+MS5611_Status_t MS5611_Write(MS5611_Handle_t *Handle, uint8_t Command);
+
+MS5611_Status_t MS5611_Read(MS5611_Handle_t *Handle, uint8_t *DataR,
+                            uint8_t Size);
+
+MS5611_Status_t MS5611_Reset(MS5611_Handle_t *Handle);
+
+MS5611_Status_t MS5611_Read_Prom(MS5611_Handle_t *Handle);
+
+MS5611_Status_t MS5611_Convert_Temperature (MS5611_Handle_t *Handle);
+
 
 /* Private defines -----------------------------------------------------------*/
 #define MS5611_ADDRESS (0x77)
@@ -89,4 +103,6 @@ MS5611_Read(MS5611_Handle_t *Handle, uint8_t *DataR, uint8_t Size);
 #define MS5611_CMD_CONV_D2 (0x50)
 #define MS5611_CMD_READ_PROM (0xA2)
 
+#define MS5611_2_POW_8 256
+#define MS5611_2_POW_23 8388608
 #endif /* __MS5611_H_ */

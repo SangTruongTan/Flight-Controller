@@ -21,6 +21,7 @@ by this software, read more about this on the GNU General Public License.
 /* Private includes ----------------------------------------------------------*/
 #include "HMC5883.h"
 #include "ST_MPU6050.h"
+#include "MS5611.h"
 #include "main.h"
 
 /* Private typedef -----------------------------------------------------------*/

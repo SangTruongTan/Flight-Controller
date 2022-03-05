@@ -75,7 +75,7 @@ MPU6050_Status_t MPU6050_Write(MPU6050_handle_t *Handle, uint8_t *ui8pDataW,
 MPU6050_State_t MPU6050_Init(MPU6050_handle_t *Handle,
                              I2C_HandleTypeDef *hi2c) {
     uint8_t ui8buffer;
-    HAL_StatusTypeDef Status;
+    MPU6050_Status_t Status;
     uint32_t i = 0;
     MPU6050_InitTypedef mpuInitTypeDef = Handle->Init;
     float *Mpu6050_AcceSensi = &Handle->AcceSens;
@@ -191,7 +191,6 @@ MPU6050_State_t MPU6050_Init(MPU6050_handle_t *Handle,
 MPU6050_State_t MPU6050_AcceRead_Raw(MPU6050_handle_t *Handle) {
     uint8_t ui8Buffer[6];
     MPU6050_AcceDataRaw acRaw;
-    MPU6050_State_t State = MPU6050_OK;
     MPU6050_Status_t Status = MPU6050_OK;
     // Read X, Y, Z value
     Status = MPU6050_Read(Handle, ui8Buffer, MPU6050_ACCEL_XOUT_H_REG, 6);
