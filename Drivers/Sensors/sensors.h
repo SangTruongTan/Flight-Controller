@@ -20,8 +20,8 @@ by this software, read more about this on the GNU General Public License.
 
 /* Private includes ----------------------------------------------------------*/
 #include "HMC5883.h"
-#include "ST_MPU6050.h"
 #include "MS5611.h"
+#include "ST_MPU6050.h"
 #include "main.h"
 
 /* Private typedef -----------------------------------------------------------*/
@@ -29,16 +29,19 @@ typedef enum Sensor_status_t {
     SENSOR_OK = 0U,
     SENSOR_ERROR_MPU = 0x01U,
     SENSOR_ERROR_HMC = 0x02U,
-    SENSOR_ERROR_BOTH = 0x03U,
+    SENSOR_ERROR_MS = 0x04U,
 } Sensor_status_t;
 
 typedef struct Sensor_handle_t {
     MPU6050_handle_t mpuHandler;
     HMC5883L_Handle_t hmcHandler;
+    MS5611_Handle_t msHandler;
+    I2C_HandleTypeDef *mshi2c;
     I2C_HandleTypeDef *mpuhi2c;
     I2C_HandleTypeDef *hmchi2c;
     bool enableHMC;
     bool enableMPU;
+    bool enableMS;
     Sensor_status_t status;
 } Sensor_handle_t;
 

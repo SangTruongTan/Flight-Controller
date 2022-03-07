@@ -1,35 +1,57 @@
 {
-    "configurations": [
-        {
-            "name": "Win32",
-            "includePath": [
-                "${workspaceFolder}/**",
-                "${workspaceFolder}/Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F",
-                "${workspaceFolder}/Core/Inc",
-                "${workspaceFolder}/Drivers/Sensors",
-                "${workspaceFolder}/Drivers/MPU6050",
-                "${workspaceFolder}/Drivers/STM32F4xx_HAL_Driver/Inc",
-                "${workspaceFolder}/Drivers/CMSIS/Device/ST/STM32F4xx/Include",
-                "${workspaceFolder}/Drivers/HMC5883/Inc",
-                "${workspaceFolder}/Drivers/MS5611/Inc",
-                "${workspaceFolder}/Drivers/CMSIS/Core/Include"
-            ],
-            "defines": [
-                "_DEBUG",
-                "UNICODE",
-                "_UNICODE",
-                "USE_HAL_DRIVER",
-                "STM32F405xx"
-            ],
-            "intelliSenseMode": "gcc-arm",
-            "compilerPath": "${env:ARMGCC_DIR}/arm-none-eabi-gcc.exe",
-            "compilerArgs": [
-                "-mcpu=cortex-m4",
-                "-mthumb"
-            ],
-            "cStandard": "c11",
-            "cppStandard": "c++17"
-        }
-    ],
-    "version": 4
+  "configurations": [
+    {
+      "name": "Win32",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "${workspaceFolder}/Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F",
+        "${workspaceFolder}/Core/Inc",
+        "${workspaceFolder}/Drivers/Sensors",
+        "${workspaceFolder}/Drivers/MPU6050",
+        "${workspaceFolder}/Drivers/STM32F4xx_HAL_Driver/Inc",
+        "${workspaceFolder}/Drivers/CMSIS/Device/ST/STM32F4xx/Include",
+        "${workspaceFolder}/Drivers/HMC5883/Inc",
+        "${workspaceFolder}/Drivers/MS5611/Inc",
+        "${workspaceFolder}/Drivers/CMSIS/Core/Include"
+      ],
+      "defines": [
+        "_DEBUG",
+        "UNICODE",
+        "_UNICODE",
+        "USE_HAL_DRIVER",
+        "STM32F405xx"
+      ],
+      "intelliSenseMode": "gcc-arm",
+      "compilerPath": "${env:ARMGCC_DIR}/arm-none-eabi-gcc.exe",
+      "compilerArgs": [
+        "-mcpu=cortex-m4",
+        "-mthumb"
+      ],
+      "cStandard": "c11",
+      "cppStandard": "c++17"
+    },
+    {
+      "name": "STM32",
+      "includePath": [
+        "Core/Inc",
+        "Drivers/CMSIS/Device/ST/STM32F4xx/Include",
+        "Drivers/CMSIS/Include",
+        "Drivers/HMC5883/Inc",
+        "Drivers/MPU6050/Inc",
+        "Drivers/MS5611/Inc",
+        "Drivers/STM32F4xx_HAL_Driver/Inc",
+        "Drivers/STM32F4xx_HAL_Driver/Inc/Legacy",
+        "Drivers/Sensors",
+        "Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS",
+        "Middlewares/Third_Party/FreeRTOS/Source/include",
+        "Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F"
+      ],
+      "defines": [
+        "STM32F405xx",
+        "USE_HAL_DRIVER"
+      ],
+      "compilerPath": "C:\\PROGRAM FILES (X86)\\GNU ARM EMBEDDED TOOLCHAIN\\10 2021.10\\BIN\\ARM-NONE-EABI-GCC.EXE"
+    }
+  ],
+  "version": 4
 }

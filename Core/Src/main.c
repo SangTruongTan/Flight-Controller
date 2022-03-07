@@ -66,6 +66,7 @@ UART_HandleTypeDef huart3;
 uint8_t count = 0;
 
 TaskHandle_t DefaultTask;
+TaskHandle_t LoopTask;
 
 Sensor_handle_t sensors;
 /* USER CODE END PV */
@@ -85,7 +86,7 @@ static void MX_USART3_UART_Init(void);
 /* USER CODE BEGIN PFP */
 int _write(int file, char *outgoing, int len);
 void Default_task(void *pvParameters);
-
+void Loop_task(void *pvParameters);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -249,7 +250,7 @@ static void MX_I2C1_Init(void) {
 
     /* USER CODE END I2C1_Init 1 */
     hi2c1.Instance = I2C1;
-    hi2c1.Init.ClockSpeed = 100000;
+    hi2c1.Init.ClockSpeed = 400000;
     hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
     hi2c1.Init.OwnAddress1 = 0;
     hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
@@ -279,7 +280,7 @@ static void MX_I2C2_Init(void) {
 
     /* USER CODE END I2C2_Init 1 */
     hi2c2.Instance = I2C2;
-    hi2c2.Init.ClockSpeed = 100000;
+    hi2c2.Init.ClockSpeed = 400000;
     hi2c2.Init.DutyCycle = I2C_DUTYCYCLE_2;
     hi2c2.Init.OwnAddress1 = 0;
     hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
@@ -502,27 +503,68 @@ int _write(int file, char *outgoing, int len) {
 void Default_task(void *pvParameters) {
     sensors.hmchi2c = &hi2c2;
     sensors.mpuhi2c = &hi2c1;
+    sensors.mshi2c = &hi2c1;
+    sensors.msHandler.wait = vTaskDelay;
     Sensor_status_t sensorStatus = sensors_init(&sensors);
     printf("Status Sensor: %d\r\n", sensorStatus);
+    if (sensorStatus == SENSOR_OK) {
+        printf("The Standard Pressure:%ld\r\n",
+               sensors.msHandler.Altitude.StandardPressure);
+    }
     TickType_t xTimerStart = xTaskGetTickCount();
+    xTaskCreate(&Loop_task, "Loop", 512, NULL, 2, &LoopTask);
     for (;;) {
-        Sensor_status_t SenStatus = sensors_update(&sensors);
-        if (SenStatus == SENSOR_OK) {
-            MPU6050_AcceDataScaled Acce = sensors.mpuHandler.AccScaled;
-            MPU6050_GyroDataScaled Gyro = sensors.mpuHandler.GyroScaled;
-            HMC5883L_Scaled_t Hmc = sensors.hmcHandler.Scaled;
-            printf("Accelerometer: X=%f, Y=%f, Z=%f\r\n", Acce.x, Acce.y,
-                   Acce.z);
-            printf("Gyroscope: X=%f, Y=%f, Z=%f\r\n", Gyro.x, Gyro.y, Gyro.z);
-            printf("Magnetometer: X= %f, Y=%f, Z=%f\r\n\r\n\r\n", Hmc.x, Hmc.y,
-                   Hmc.z);
+        // Calculate the temperature and the Pressure
+        if (sensors.msHandler.Status == MS5611_OK) {
+            MS5611_Get_Altitude(&sensors.msHandler);
+            printf("Temp:%0.2f, Altitude:%0.2f, Pressure:%0.6f\r\n",
+                   sensors.msHandler.Temp.Degree,
+                   sensors.msHandler.Altitude.Altitude,
+                   sensors.msHandler.Pressure.Pressure);
         } else {
-            printf("Detected error with error_code:%d\r\n", sensors.status);
+            printf("Error:%d\r\n", sensors.msHandler.Status);
         }
+
+        // Sensor_status_t SenStatus = sensors_update(&sensors);
+        // printf("Status:%d\r\n", SenStatus);
+        // if (SenStatus == SENSOR_OK) {
+        //     MPU6050_AcceDataScaled Acce = sensors.mpuHandler.AccScaled;
+        //     MPU6050_GyroDataScaled Gyro = sensors.mpuHandler.GyroScaled;
+        //     HMC5883L_Scaled_t Hmc = sensors.hmcHandler.Scaled;
+        //     printf("Accelerometer: X=%f, Y=%f, Z=%f\r\n", Acce.x, Acce.y,
+        //            Acce.z);
+        //     printf("Gyroscope: X=%f, Y=%f, Z=%f\r\n", Gyro.x, Gyro.y,
+        //     Gyro.z); printf("Magnetometer: X= %f, Y=%f, Z=%f\r\n\r\n\r\n",
+        //     Hmc.x, Hmc.y,
+        //            Hmc.z);
+        // } else {
+        //     printf("Detected error with error_code:%d\r\n", sensors.status);
+        // }
         vTaskDelayUntil(&xTimerStart, 1000);
     }
 }
+
+void Loop_task(void *pvParameters) {
+    int count = 0;
+    TickType_t StartTask = xTaskGetTickCount();
+    for (;;) {
+        TickType_t Start = xTaskGetTickCount();
+        sensors_update(&sensors);
+        if (sensors.status != SENSOR_OK) {
+            printf("The Sensors error:%d\r\n", sensors.status);
+        }
+        TickType_t Stop = xTaskGetTickCount();
+        count++;
+        if (count == 50) {
+            printf("Time=%ld\r\n", Stop - Start);
+            count = 0;
+        }
+        vTaskDelayUntil(&StartTask, 4);
+    }
+}
 /* USER CODE END 4 */
+
+/* USER CODE BEGIN Header_StartDefaultTask */
 
 /**
  * @brief  Period elapsed callback in non blocking mode

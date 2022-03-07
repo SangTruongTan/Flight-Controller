@@ -31,6 +31,7 @@ void sensors_user_modify(Sensor_handle_t *Handle) {
     // Enable the sensors
     Handle->enableHMC = true;
     Handle->enableMPU = true;
+    Handle->enableMS = true;
     // Init for the MPU
     Handle->mpuHandler.Init.ui8AcceFullScale = MPU6050_ACCE_FULLSCALE_2G;
     Handle->mpuHandler.Init.ui8GyroFullScale = MPU6050_GYRO_FULLSCALE_500DPS;
@@ -41,6 +42,9 @@ void sensors_user_modify(Sensor_handle_t *Handle) {
     Handle->hmcHandler.Init.Gain = HMC5883L_GAIN_1090;
     Handle->hmcHandler.Init.Mode = HMC5883L_MODE_CONTINUOUS;
     Handle->hmcHandler.Init.OutputRate = HMC5883L_RATE_75;
+
+    // Init for the presure sensor
+    Handle->msHandler.Osr = MS5611_ULTRA_HIGH_RES;
     /* USER CODE END */
 }
 
@@ -55,6 +59,7 @@ Sensor_status_t sensors_init(Sensor_handle_t *Handle) {
     *SenStatus = SENSOR_OK;
     MPU6050_State_t mpuState;
     HMC5883L_State_t hmcState;
+    MS5611_Status_t msStatus;
     // Init the sensors
     sensors_user_modify(Handle);
     // Call the mpu init function
@@ -69,6 +74,13 @@ Sensor_status_t sensors_init(Sensor_handle_t *Handle) {
         hmcState = HMC5883L_Init(&Handle->hmcHandler, Handle->hmchi2c);
         if (hmcState != HMC5883L_OK_STATE) {
             *SenStatus |= SENSOR_ERROR_MPU;
+        }
+    }
+    // Call the ms5611 init function
+    if (Handle->enableMS == true) {
+        msStatus = MS5611_Init(&Handle->msHandler, Handle->mshi2c);
+        if (msStatus != MS5611_OK) {
+            *SenStatus |= SENSOR_ERROR_MS;
         }
     }
     return *SenStatus;
@@ -94,6 +106,12 @@ Sensor_status_t sensors_update(Sensor_handle_t *Handle) {
     if (Handle->enableHMC == true) {
         HMC5883L_Status_t status = HMC5883L_Get_Scaled(&Handle->hmcHandler);
         if (status != HMC5883L_OK) *SenStatus |= SENSOR_ERROR_HMC;
+    }
+    // Get the pressure sensor data
+    if (Handle->enableMS == true) {
+        MS5611_Status_t status;
+        status = MS5611_Update(&Handle->msHandler);
+        if (status != MS5611_OK) *SenStatus |= SENSOR_ERROR_MS;
     }
     return SENSOR_OK;
 }

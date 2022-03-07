@@ -14,5 +14,19 @@
                 "target/stm32f4x.cfg"
             ]
         },
+        {
+            "showDevDebugOutput": "parsed",
+            "cwd": "${workspaceRoot}",
+            "executable": "./build/FlightController.elf",
+            "name": "Debug STM32",
+            "request": "launch",
+            "type": "cortex-debug",
+            "servertype": "openocd",
+            "preLaunchTask": "Build STM",
+            "device": "stm32f405",
+            "configFiles": [
+                "openocd.cfg"
+            ]
+        }
     ]
 }
