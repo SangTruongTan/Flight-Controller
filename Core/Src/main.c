@@ -61,14 +61,21 @@ TIM_HandleTypeDef htim5;
 UART_HandleTypeDef huart5;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart3;
+DMA_HandleTypeDef hdma_uart5_rx;
+DMA_HandleTypeDef hdma_usart1_rx;
+DMA_HandleTypeDef hdma_usart3_rx;
 
 /* USER CODE BEGIN PV */
 uint8_t count = 0;
 
 TaskHandle_t DefaultTask;
 TaskHandle_t LoopTask;
+TaskHandle_t GpsTask;
+
+RingBuffer_t Ring;
 
 Sensor_handle_t sensors;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -80,13 +87,15 @@ static void MX_ADC1_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_TIM5_Init(void);
-static void MX_UART5_Init(void);
 static void MX_USART3_UART_Init(void);
+static void MX_UART5_Init(void);
 
 /* USER CODE BEGIN PFP */
 int _write(int file, char *outgoing, int len);
 void Default_task(void *pvParameters);
 void Loop_task(void *pvParameters);
+void GPS_task(void *pvParameters);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -123,21 +132,20 @@ int main(void) {
 
     /* Initialize all configured peripherals */
     MX_GPIO_Init();
-    MX_USART1_UART_Init();
     MX_DMA_Init();
     MX_ADC1_Init();
     MX_I2C1_Init();
     MX_I2C2_Init();
     MX_TIM5_Init();
-    MX_UART5_Init();
+    MX_USART1_UART_Init();
     MX_USART3_UART_Init();
+    MX_UART5_Init();
+    HAL_Delay(500);
     /* USER CODE BEGIN 2 */
     xTaskCreate(&Default_task, "Default", 512, NULL, 1, &DefaultTask);
-
     // Start Scheduler
     vTaskStartScheduler();
     /* USER CODE END 2 */
-
     /* We should never get here as control is now taken by the scheduler */
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
@@ -375,7 +383,7 @@ static void MX_UART5_Init(void) {
 
     /* USER CODE END UART5_Init 1 */
     huart5.Instance = UART5;
-    huart5.Init.BaudRate = 115200;
+    huart5.Init.BaudRate = 9600;
     huart5.Init.WordLength = UART_WORDLENGTH_8B;
     huart5.Init.StopBits = UART_STOPBITS_1;
     huart5.Init.Parity = UART_PARITY_NONE;
@@ -454,11 +462,21 @@ static void MX_USART3_UART_Init(void) {
 static void MX_DMA_Init(void) {
     /* DMA controller clock enable */
     __HAL_RCC_DMA2_CLK_ENABLE();
+    __HAL_RCC_DMA1_CLK_ENABLE();
 
     /* DMA interrupt init */
+    /* DMA1_Stream0_IRQn interrupt configuration */
+    HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+    /* DMA1_Stream1_IRQn interrupt configuration */
+    HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
     /* DMA2_Stream0_IRQn interrupt configuration */
     HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
+    /* DMA2_Stream2_IRQn interrupt configuration */
+    HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
 }
 
 /**
@@ -501,70 +519,67 @@ int _write(int file, char *outgoing, int len) {
 }
 
 void Default_task(void *pvParameters) {
+    //Init for Ring Buffer. Must be called first
+    Ring.Ring1.enable = true;
+    Ring.Ring2.enable = false;
+    Ring.Ring3.enable = true;
+    Ring.Ring1.hdma = &hdma_usart1_rx;
+    Ring.Ring1.huart = &huart1;
+    Ring.Ring3.hdma = &hdma_uart5_rx;
+    Ring.Ring3.huart = &huart5;
+    Ring.GetTime = xTaskGetTickCount;
+    //Init for sensors
     sensors.hmchi2c = &hi2c2;
     sensors.mpuhi2c = &hi2c1;
     sensors.mshi2c = &hi2c1;
+    sensors.gpsRing = &Ring.Ring3;
     sensors.msHandler.wait = vTaskDelay;
+    Ring_Init(&Ring);
     Sensor_status_t sensorStatus = sensors_init(&sensors);
     printf("Status Sensor: %d\r\n", sensorStatus);
-    if (sensorStatus == SENSOR_OK) {
-        printf("The Standard Pressure:%ld\r\n",
-               sensors.msHandler.Altitude.StandardPressure);
-    }
-    TickType_t xTimerStart = xTaskGetTickCount();
-    xTaskCreate(&Loop_task, "Loop", 512, NULL, 2, &LoopTask);
+    // if (sensorStatus != SENSOR_OK) {
+    //     while (1)
+    //         ;
+    // } else {
+    //     printf("The Standard Pressure:%ld\r\n",
+    //            sensors.msHandler.Altitude.StandardPressure);
+    // }
+    xTaskCreate(&GPS_task, "Gps", 512, NULL, 2, &GpsTask);
+    vTaskDelete(DefaultTask);
     for (;;) {
-        // Calculate the temperature and the Pressure
-        if (sensors.msHandler.Status == MS5611_OK) {
-            MS5611_Get_Altitude(&sensors.msHandler);
-            printf("Temp:%0.2f, Altitude:%0.2f, Pressure:%0.6f\r\n",
-                   sensors.msHandler.Temp.Degree,
-                   sensors.msHandler.Altitude.Altitude,
-                   sensors.msHandler.Pressure.Pressure);
-        } else {
-            printf("Error:%d\r\n", sensors.msHandler.Status);
-        }
-
-        // Sensor_status_t SenStatus = sensors_update(&sensors);
-        // printf("Status:%d\r\n", SenStatus);
-        // if (SenStatus == SENSOR_OK) {
-        //     MPU6050_AcceDataScaled Acce = sensors.mpuHandler.AccScaled;
-        //     MPU6050_GyroDataScaled Gyro = sensors.mpuHandler.GyroScaled;
-        //     HMC5883L_Scaled_t Hmc = sensors.hmcHandler.Scaled;
-        //     printf("Accelerometer: X=%f, Y=%f, Z=%f\r\n", Acce.x, Acce.y,
-        //            Acce.z);
-        //     printf("Gyroscope: X=%f, Y=%f, Z=%f\r\n", Gyro.x, Gyro.y,
-        //     Gyro.z); printf("Magnetometer: X= %f, Y=%f, Z=%f\r\n\r\n\r\n",
-        //     Hmc.x, Hmc.y,
-        //            Hmc.z);
-        // } else {
-        //     printf("Detected error with error_code:%d\r\n", sensors.status);
-        // }
-        vTaskDelayUntil(&xTimerStart, 1000);
     }
 }
 
 void Loop_task(void *pvParameters) {
-    int count = 0;
     TickType_t StartTask = xTaskGetTickCount();
     for (;;) {
-        TickType_t Start = xTaskGetTickCount();
         sensors_update(&sensors);
         if (sensors.status != SENSOR_OK) {
             printf("The Sensors error:%d\r\n", sensors.status);
         }
-        TickType_t Stop = xTaskGetTickCount();
-        count++;
-        if (count == 50) {
-            printf("Time=%ld\r\n", Stop - Start);
-            count = 0;
-        }
         vTaskDelayUntil(&StartTask, 4);
     }
 }
-/* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_StartDefaultTask */
+void GPS_task(void *pvParameters) {
+    TickType_t StartTask = xTaskGetTickCount();
+    for (;;) {
+        if (Sensor_Gps_Update(&sensors) ==  SENSOR_OK) {
+            GpsHandler_t GpsHandler = sensors.gpsHandler;
+            HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+            printf("Time:%dh %dm %ds\r\n", GpsHandler.Position.Time.Hour,
+                   GpsHandler.Position.Time.Minute,
+                   GpsHandler.Position.Time.Seconds);
+            printf("Lat:%f, Long:%f, Fixed:%d, Satellites:%d\r\n",
+                   GpsHandler.Position.Latitude, GpsHandler.Position.Longitude,
+                   GpsHandler.Position.Fixed, GpsHandler.Position.Sattellites);
+        } else {
+            printf("Error with error code:%d\r\n", sensors.gpsHandler.Status);
+        }
+        vTaskDelayUntil(&StartTask, 500);
+    }
+}
+/* USER CODE END 4 */
 
 /**
  * @brief  Period elapsed callback in non blocking mode

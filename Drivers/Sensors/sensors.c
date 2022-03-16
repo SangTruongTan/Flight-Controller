@@ -32,6 +32,7 @@ void sensors_user_modify(Sensor_handle_t *Handle) {
     Handle->enableHMC = true;
     Handle->enableMPU = true;
     Handle->enableMS = true;
+    Handle->enableGps = true;
     // Init for the MPU
     Handle->mpuHandler.Init.ui8AcceFullScale = MPU6050_ACCE_FULLSCALE_2G;
     Handle->mpuHandler.Init.ui8GyroFullScale = MPU6050_GYRO_FULLSCALE_500DPS;
@@ -45,6 +46,9 @@ void sensors_user_modify(Sensor_handle_t *Handle) {
 
     // Init for the presure sensor
     Handle->msHandler.Osr = MS5611_ULTRA_HIGH_RES;
+
+    // Init for the GPS Module
+    Handle->gpsHandler.Serial = Handle->gpsRing;
     /* USER CODE END */
 }
 
@@ -73,7 +77,7 @@ Sensor_status_t sensors_init(Sensor_handle_t *Handle) {
     if (Handle->enableHMC == true) {
         hmcState = HMC5883L_Init(&Handle->hmcHandler, Handle->hmchi2c);
         if (hmcState != HMC5883L_OK_STATE) {
-            *SenStatus |= SENSOR_ERROR_MPU;
+            *SenStatus |= SENSOR_ERROR_HMC;
         }
     }
     // Call the ms5611 init function
@@ -83,6 +87,8 @@ Sensor_status_t sensors_init(Sensor_handle_t *Handle) {
             *SenStatus |= SENSOR_ERROR_MS;
         }
     }
+    // Call the Gps module Init function
+
     return *SenStatus;
 }
 
@@ -114,4 +120,22 @@ Sensor_status_t sensors_update(Sensor_handle_t *Handle) {
         if (status != MS5611_OK) *SenStatus |= SENSOR_ERROR_MS;
     }
     return SENSOR_OK;
+}
+
+/**
+ * @brief Update data for the Gps Module. Must be called with below 500ms
+ * period.
+ * @param Handler The pointer of the sensors handler.
+ * @retval Sensor_status_t
+ */
+Sensor_status_t Sensor_Gps_Update(Sensor_handle_t *Handler) {
+    Sensor_status_t retval = SENSOR_OK;
+    if(Handler->enableGps == true){
+        GpsStatus_t status = Gps_Process(&Handler->gpsHandler);
+        Handler->gpsHandler.Status = status;
+        if(status != GPS_OK) {
+            retval |= SENSOR_ERROR_GPS;
+        }
+    }
+    return retval;
 }

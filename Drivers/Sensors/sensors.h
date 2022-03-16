@@ -22,6 +22,7 @@ by this software, read more about this on the GNU General Public License.
 #include "HMC5883.h"
 #include "MS5611.h"
 #include "ST_MPU6050.h"
+#include "UbloxGps.h"
 #include "main.h"
 
 /* Private typedef -----------------------------------------------------------*/
@@ -30,18 +31,22 @@ typedef enum Sensor_status_t {
     SENSOR_ERROR_MPU = 0x01U,
     SENSOR_ERROR_HMC = 0x02U,
     SENSOR_ERROR_MS = 0x04U,
+    SENSOR_ERROR_GPS = 0x08U,
 } Sensor_status_t;
 
 typedef struct Sensor_handle_t {
     MPU6050_handle_t mpuHandler;
     HMC5883L_Handle_t hmcHandler;
     MS5611_Handle_t msHandler;
+    GpsHandler_t gpsHandler;
     I2C_HandleTypeDef *mshi2c;
     I2C_HandleTypeDef *mpuhi2c;
     I2C_HandleTypeDef *hmchi2c;
+    RingHandler_t *gpsRing;
     bool enableHMC;
     bool enableMPU;
     bool enableMS;
+    bool enableGps;
     Sensor_status_t status;
 } Sensor_handle_t;
 
@@ -66,5 +71,7 @@ Sensor_status_t sensors_init(Sensor_handle_t *Handle);
  * @retval Sensor_status_t
  */
 Sensor_status_t sensors_update(Sensor_handle_t *Handle);
+
+Sensor_status_t Sensor_Gps_Update(Sensor_handle_t *Handler);
 
 #endif /* End of File */

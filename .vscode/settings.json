@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "stm32f4xx_hal.h": "c",
+        "uartringbufdma.h": "c",
+        "main.h": "c"
+    }
+}
