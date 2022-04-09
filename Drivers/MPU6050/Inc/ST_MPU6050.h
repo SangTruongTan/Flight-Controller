@@ -24,9 +24,14 @@ by this software, read more about this on the GNU General Public License.
 
 /* System Header files */
 #include <main.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
+
+#include "Sensor_MPU.h"
+
 /* User header files */
 
 /* List of defines */
@@ -34,6 +39,7 @@ by this software, read more about this on the GNU General Public License.
 /* Constant value */
 #define G_VALUE 9.80665f
 
+#define dt 0.004f
 /* I2C device address */
 #define MPU6050_Address ((uint8_t)0x68 << 1)
 
@@ -71,7 +77,7 @@ by this software, read more about this on the GNU General Public License.
 #define MPU6050_GYRO_ZOUT_L_REG 0x48
 
 #define MPU6050_USER_CTRL_REG 0x6A
-#define MPU6050_PWR_MGMT_1_REG 0x6B
+#define  MPU6050_PWR_MGMT_1_REG 0x6B
 #define MPU6050_PWR_MGMT_2_REG 0x6C
 
 #define MPU6050_WHO_AM_I_REG 0x75
@@ -146,6 +152,7 @@ typedef struct MPU6050_AcceDataRaw {
     int16_t x;
     int16_t y;
     int16_t z;
+    int32_t totalVector;
 } MPU6050_AcceDataRaw;
 
 // Accelerometer Data Scaled
@@ -187,9 +194,15 @@ typedef struct MPU6050_handle_t {
     MPU6050_Status_t Status;
     MPU6050_InitTypedef Init;
     MPU6050_AcceDataRaw AccRaw;
+    MPU6050_AcceDataRaw AccOffset;
     MPU6050_AcceDataScaled AccScaled;
     MPU6050_GyroDataRaw GyroRaw;
     MPU6050_GyroDataScaled GyroScaled;
+    MPU6050_GyroDataRaw GyroOffset;
+    MPU6050_GyroAxis GyroAxis;
+    MPU6050_GyroAxis GyroInput;
+    MPU6050_GyroAxis AngleAjust;
+    MPU6050_AcceAxis AcceAxis;
     float AcceSens;
     float GyroSens;
 } MPU6050_handle_t;

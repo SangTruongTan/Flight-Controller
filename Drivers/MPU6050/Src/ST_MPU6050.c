@@ -23,6 +23,13 @@ by this software, read more about this on the GNU General Public License.
 #include "ST_MPU6050.h"
 
 /********************* Global Variable *********************/
+#define M_PI		3.14159265358979323846
+
+/* External inputs (root inport signals with default storage) */
+extern ExtU rtU;
+
+/* External outputs (root outports fed by signals with default storage) */
+extern ExtY rtY;
 
 /******************** Function Definitions *********************/
 
@@ -111,7 +118,7 @@ MPU6050_State_t MPU6050_Init(MPU6050_handle_t *Handle,
         asm("NOP");
     }
 
-    ui8buffer = 0x08;  // Enable IMU
+    ui8buffer = 0x00;  // Enable IMU
     Status = MPU6050_Write(Handle, &ui8buffer, MPU6050_PWR_MGMT_1_REG, 1);
     Handle->Status = Status;
     if (Status != MPU6050_OK) {
@@ -200,8 +207,13 @@ MPU6050_State_t MPU6050_AcceRead_Raw(MPU6050_handle_t *Handle) {
         return MPU6050_ERROR_STATE;
     }
     acRaw.x = ui8Buffer[0] << 8 | ui8Buffer[1];
+    acRaw.x -= Handle->AccOffset.x;
     acRaw.y = ui8Buffer[2] << 8 | ui8Buffer[3];
+    acRaw.y *= -1;
+    acRaw.y -= Handle->AccOffset.y;
     acRaw.z = ui8Buffer[4] << 8 | ui8Buffer[5];
+    acRaw.totalVector =
+        sqrt((acRaw.x * acRaw.x) + (acRaw.y * acRaw.y) + (acRaw.z * acRaw.z));
     Handle->AccRaw = acRaw;
     Handle->State = MPU6050_OK_STATE;
     return MPU6050_OK_STATE;
@@ -223,9 +235,9 @@ MPU6050_State_t MPU6050_AcceRead_Scaled(MPU6050_handle_t *Handle) {
         return MPU6050_ERROR_STATE;
     }
     mpuRaw = Handle->AccRaw;
-    mpuScaled.x = (float)mpuRaw.x / Mpu6050_AcceSensi * G_VALUE;
-    mpuScaled.y = (float)mpuRaw.y / Mpu6050_AcceSensi * G_VALUE;
-    mpuScaled.z = (float)mpuRaw.z / Mpu6050_AcceSensi * G_VALUE;
+    mpuScaled.x = (float)(mpuRaw.x) / Mpu6050_AcceSensi * G_VALUE;
+    mpuScaled.y = (float)(mpuRaw.y) / Mpu6050_AcceSensi * G_VALUE;
+    mpuScaled.z = (float)(mpuRaw.z) / Mpu6050_AcceSensi * G_VALUE;
     Handle->AccScaled = mpuScaled;
     return MPU6050_OK_STATE;
 }
@@ -243,8 +255,14 @@ MPU6050_State_t MPU6050_GyroRead_Raw(MPU6050_handle_t *Handle) {
         return MPU6050_ERROR_STATE;
     }
     mpuRaw.x = ui8Buffer[0] << 8 | ui8Buffer[1];
+    mpuRaw.x *= -1;
+    mpuRaw.x -= Handle->GyroOffset.x;
     mpuRaw.y = ui8Buffer[2] << 8 | ui8Buffer[3];
+    mpuRaw.y *= -1;
+    mpuRaw.y -= Handle->GyroOffset.y;
     mpuRaw.z = ui8Buffer[4] << 8 | ui8Buffer[5];
+    mpuRaw.z *= -1;
+    mpuRaw.z -= Handle->GyroOffset.z;
     Handle->GyroRaw = mpuRaw;
     Handle->State = MPU6050_OK_STATE;
     return MPU6050_OK_STATE;
@@ -262,9 +280,9 @@ MPU6050_State_t MPU6050_GyroRead_Scaled(MPU6050_handle_t *Handle) {
         return MPU6050_ERROR_STATE;
     }
     mpuRaw = Handle->GyroRaw;
-    mpuScaled.x = (float)mpuRaw.x / Mpu6050_GyroSensi;
-    mpuScaled.y = (float)mpuRaw.y / Mpu6050_GyroSensi;
-    mpuScaled.z = (float)mpuRaw.z / Mpu6050_GyroSensi;
+    mpuScaled.x = (float)(mpuRaw.x) / Mpu6050_GyroSensi;
+    mpuScaled.y = (float)(mpuRaw.y) / Mpu6050_GyroSensi;
+    mpuScaled.z = (float)(mpuRaw.z) / Mpu6050_GyroSensi;
     Handle->GyroScaled = mpuScaled;
     return MPU6050_OK_STATE;
 }
@@ -275,16 +293,61 @@ MPU6050_State_t MPU6050_GyroRead_Scaled(MPU6050_handle_t *Handle) {
  */
 MPU6050_State_t MPU6050_read_mpu_data(MPU6050_handle_t *Handle) {
     MPU6050_State_t State;
-    State = MPU6050_AcceRead_Scaled(Handle);
+    float Mpu6050_GyroSensi = Handle->GyroSens;
+    State = MPU6050_AcceRead_Raw(Handle);
     Handle->State = State;
     if (State != MPU6050_OK_STATE) {
         return MPU6050_ERROR_STATE;
     }
-    State = MPU6050_GyroRead_Scaled(Handle);
+    State = MPU6050_GyroRead_Raw(Handle);
     Handle->State = State;
     if (State != MPU6050_OK_STATE) {
         return MPU6050_ERROR_STATE;
     }
+    //Apply the filter
+    rtU.sensor_data_in.ddx = Handle->AccRaw.x;
+    rtU.sensor_data_in.ddy = Handle->AccRaw.y;
+    rtU.sensor_data_in.ddz = Handle->AccRaw.z;
+    rtU.sensor_data_in.p = Handle->GyroRaw.x;
+    rtU.sensor_data_in.q = Handle->GyroRaw.y;
+    rtU.sensor_data_in.r = Handle->GyroRaw.z;
+    Sensor_step();
+    Handle->AccRaw.x = rtY.ddx;
+    Handle->AccRaw.y = rtY.ddy;
+    Handle->AccRaw.z = rtY.ddz;
+    Handle->GyroRaw.x = rtY.p;
+    Handle->GyroRaw.y = rtY.q;
+    Handle->GyroRaw.z = rtY.r;
+    //Calculate angle from the angularate
+    Handle->GyroInput.pitch =
+        Handle->GyroInput.pitch * 0.7 +
+        ((float)Handle->GyroRaw.x / Mpu6050_GyroSensi) * 0.3;
+    Handle->GyroInput.roll =
+        Handle->GyroInput.roll * 0.7 +
+        ((float)Handle->GyroRaw.y / Mpu6050_GyroSensi) * 0.3;
+    Handle->GyroInput.yaw =
+        Handle->GyroInput.yaw * 0.7 +
+        ((float)Handle->GyroRaw.z / Mpu6050_GyroSensi) * 0.3;
+    // Gyro angle calculations
+    Handle->GyroAxis.roll += (float)Handle->GyroRaw.y * 0.0000611;
+    Handle->GyroAxis.pitch += (float)Handle->GyroRaw.x * 0.0000611;
+    Handle->GyroAxis.yaw += (float)Handle->GyroRaw.z * 0.0000611;
+    if (Handle->GyroAxis.yaw < 0) {
+        Handle->GyroAxis.yaw += 360;
+    } else if (Handle->GyroAxis.yaw > 360) {
+        Handle->GyroAxis.yaw -= 360;
+    }
+    //Compenstate for roll and pitch
+    Handle->GyroAxis.pitch -= Handle->GyroAxis.roll*sin((float)Handle->GyroRaw.z * 0.000001066);
+    Handle->GyroAxis.roll += Handle->GyroAxis.pitch*sin((float)Handle->GyroRaw.z * 0.000001066);
+    // Acceleration calculated
+    if(abs(Handle->AccRaw.x) < Handle->AccRaw.totalVector) {
+        Handle->AcceAxis.roll = asin((float)Handle->AccRaw.x/Handle->AccRaw.totalVector)*180/M_PI;
+    }
+    if(abs(Handle->AccRaw.y) < Handle->AccRaw.totalVector) {
+        Handle->AcceAxis.pitch = asin((float)Handle->AccRaw.y/Handle->AccRaw.totalVector)*180/M_PI;
+    }
+
     return MPU6050_OK_STATE;
 }
 

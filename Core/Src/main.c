@@ -22,7 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "RemoteControl.h"
 // FreeRTOS
 #include "FreeRTOS.h"
 #include "event_groups.h"
@@ -32,6 +32,7 @@
 #include "task.h"
 #include "timers.h"
 // MEMS
+#include "PID_PWM.h"
 #include "sensors.h"
 /* USER CODE END Includes */
 
@@ -42,6 +43,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define dt 0.004f
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -71,10 +74,13 @@ uint8_t count = 0;
 TaskHandle_t DefaultTask;
 TaskHandle_t LoopTask;
 TaskHandle_t GpsTask;
+TaskHandle_t ControlTask;
 
 RingBuffer_t Ring;
-
 Sensor_handle_t sensors;
+ControlHandler_t Control;
+ControlInit_t ControlInit;
+PIDPWMHandle_t PID;
 
 /* USER CODE END PV */
 
@@ -95,6 +101,7 @@ int _write(int file, char *outgoing, int len);
 void Default_task(void *pvParameters);
 void Loop_task(void *pvParameters);
 void GPS_task(void *pvParameters);
+void Control_task(void *pvParameters);
 
 /* USER CODE END PFP */
 
@@ -140,12 +147,98 @@ int main(void) {
     MX_USART1_UART_Init();
     MX_USART3_UART_Init();
     MX_UART5_Init();
-    HAL_Delay(500);
     /* USER CODE BEGIN 2 */
+    HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_1);
+    HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_2);
+    HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_3);
+    HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_4);
+    #if MOTOR_CONFIG == 0
+    htim5.Instance->CCR1 = 1000;
+    htim5.Instance->CCR2 = 1000;
+    htim5.Instance->CCR3 = 1000;
+    htim5.Instance->CCR4 = 1000;
+    #else
+    htim5.Instance->CCR1 = 2000;
+    htim5.Instance->CCR2 = 2000;
+    htim5.Instance->CCR3 = 2000;
+    htim5.Instance->CCR4 = 2000;
+    #endif
+    HAL_Delay(200);
+    // Init for Ring Buffer. Must be called first
+    Ring.Ring1.enable = true;
+    Ring.Ring2.enable = true;
+    Ring.Ring3.enable = true;
+    Ring.Ring1.hdma = &hdma_usart1_rx;
+    Ring.Ring1.huart = &huart1;
+    Ring.Ring2.hdma = &hdma_usart3_rx;
+    Ring.Ring2.huart = &huart3;
+    Ring.Ring3.hdma = &hdma_uart5_rx;
+    Ring.Ring3.huart = &huart5;
+    Ring.GetTime = xTaskGetTickCount;
+    // Init for sensors
+    sensors.hmchi2c = &hi2c2;
+    sensors.mpuhi2c = &hi2c1;
+    sensors.mshi2c = &hi2c1;
+    sensors.gpsRing = &Ring.Ring3;
+    sensors.msHandler.wait = vTaskDelay;
+    // Init for Remote Control
+    #if MOTOR_CONFIG == 0
+    ControlInit.Mode = BLOCK_MODE;
+    #else
+    ControlInit.Mode = MANUAL_MODE;
+    #endif
+
+    ControlInit.Serial = &Ring.Ring2;
+    ControlInit.Joystick.Pitch = 1500;
+    ControlInit.Joystick.Roll = 1500;
+    ControlInit.Joystick.Yaw = 1500;
+    ControlInit.Joystick.Thrust = 1000;
+    ControlInit.ControlPid.Pitch.P = 1.3;
+    ControlInit.ControlPid.Pitch.I = 0.00;
+    ControlInit.ControlPid.Pitch.D = 18.0;
+    ControlInit.ControlPid.Roll.P = 1.3;
+    ControlInit.ControlPid.Roll.I = 0.0;
+    ControlInit.ControlPid.Roll.D = 18.0;
+    ControlInit.ControlPid.Yaw.P = 4;
+    ControlInit.ControlPid.Yaw.I = 0.02;
+    ControlInit.ControlPid.Yaw.D = 0.0;
+    ControlInit.ControlPid.Pitch.MaxPID = 400;
+    ControlInit.ControlPid.Roll.MaxPID = 400;
+    ControlInit.ControlPid.Yaw.MaxPID = 400;
+    // Initialize for PID
+    PID.htim = &htim5;
+    PID.Control = &Control.Control;
+    PID.Angle = &sensors.mpuHandler;
+    PID.Mode = &Control.Mode;
+    // Calibration value Initialize
+    Ring_Init(&Ring);
+    // The Remote Control Function must be called after the Ring Init
+    Control_Init(&Control, ControlInit);
+    // Init function for the sensors
+    sensors_init(&sensors);
+    // Init PID
+    PIDPWM_Init(&PID);
+
+    HAL_Delay(1000);
+    if (sensors.status != SENSOR_OK) {
+        HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, 0);
+        printf("Sensors error:%d\r\n", sensors.status);
+        while (1)
+            ;
+    }
+    HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, 1);
+    if (HAL_GPIO_ReadPin(BTN1_GPIO_Port, BTN1_Pin) == 0) {
+        Sensor_Gyro_Calibration(&sensors);
+    } else {
+        sensors.mpuHandler.GyroOffset.x = 114;
+        sensors.mpuHandler.GyroOffset.y = 10;
+        sensors.mpuHandler.GyroOffset.z = -45;
+    }
     xTaskCreate(&Default_task, "Default", 512, NULL, 1, &DefaultTask);
     // Start Scheduler
     vTaskStartScheduler();
     /* USER CODE END 2 */
+
     /* We should never get here as control is now taken by the scheduler */
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
@@ -322,9 +415,9 @@ static void MX_TIM5_Init(void) {
 
     /* USER CODE END TIM5_Init 1 */
     htim5.Instance = TIM5;
-    htim5.Init.Prescaler = 640;
+    htim5.Init.Prescaler = 64;
     htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
-    htim5.Init.Period = 2000;
+    htim5.Init.Period = 20000;
     htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
     htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
     if (HAL_TIM_Base_Init(&htim5) != HAL_OK) {
@@ -519,32 +612,9 @@ int _write(int file, char *outgoing, int len) {
 }
 
 void Default_task(void *pvParameters) {
-    //Init for Ring Buffer. Must be called first
-    Ring.Ring1.enable = true;
-    Ring.Ring2.enable = false;
-    Ring.Ring3.enable = true;
-    Ring.Ring1.hdma = &hdma_usart1_rx;
-    Ring.Ring1.huart = &huart1;
-    Ring.Ring3.hdma = &hdma_uart5_rx;
-    Ring.Ring3.huart = &huart5;
-    Ring.GetTime = xTaskGetTickCount;
-    //Init for sensors
-    sensors.hmchi2c = &hi2c2;
-    sensors.mpuhi2c = &hi2c1;
-    sensors.mshi2c = &hi2c1;
-    sensors.gpsRing = &Ring.Ring3;
-    sensors.msHandler.wait = vTaskDelay;
-    Ring_Init(&Ring);
-    Sensor_status_t sensorStatus = sensors_init(&sensors);
-    printf("Status Sensor: %d\r\n", sensorStatus);
-    // if (sensorStatus != SENSOR_OK) {
-    //     while (1)
-    //         ;
-    // } else {
-    //     printf("The Standard Pressure:%ld\r\n",
-    //            sensors.msHandler.Altitude.StandardPressure);
-    // }
-    xTaskCreate(&GPS_task, "Gps", 512, NULL, 2, &GpsTask);
+    // xTaskCreate(&GPS_task, "Gps", 512, NULL, 2, &GpsTask);
+    xTaskCreate(&Loop_task, "Loop", 256, NULL, 3, &LoopTask);
+    xTaskCreate(&Control_task, "Control", 256, NULL, 2, &ControlTask);
     vTaskDelete(DefaultTask);
     for (;;) {
     }
@@ -552,10 +622,20 @@ void Default_task(void *pvParameters) {
 
 void Loop_task(void *pvParameters) {
     TickType_t StartTask = xTaskGetTickCount();
+    uint32_t count = 0;
     for (;;) {
+        count++;
         sensors_update(&sensors);
+        PIDPWM_Process();
         if (sensors.status != SENSOR_OK) {
             printf("The Sensors error:%d\r\n", sensors.status);
+        } else {
+            if (count > 10) {
+                printf("%d,%d,%d,%d\r\n", PID.Motors.Esc_1, PID.Motors.Esc_2,
+                       PID.Motors.Esc_3, PID.Motors.Esc_4);
+                count = 0;
+            } else {
+            }
         }
         vTaskDelayUntil(&StartTask, 4);
     }
@@ -564,7 +644,7 @@ void Loop_task(void *pvParameters) {
 void GPS_task(void *pvParameters) {
     TickType_t StartTask = xTaskGetTickCount();
     for (;;) {
-        if (Sensor_Gps_Update(&sensors) ==  SENSOR_OK) {
+        if (Sensor_Gps_Update(&sensors) == SENSOR_OK) {
             GpsHandler_t GpsHandler = sensors.gpsHandler;
             HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
             printf("Time:%dh %dm %ds\r\n", GpsHandler.Position.Time.Hour,
@@ -573,10 +653,24 @@ void GPS_task(void *pvParameters) {
             printf("Lat:%f, Long:%f, Fixed:%d, Satellites:%d\r\n",
                    GpsHandler.Position.Latitude, GpsHandler.Position.Longitude,
                    GpsHandler.Position.Fixed, GpsHandler.Position.Sattellites);
+        } else if (sensors.gpsHandler.Status == GPS_NOTFIXED) {
+            GpsHandler_t GpsHandler = sensors.gpsHandler;
+            printf("Time:%dh %dm %ds\r\n", GpsHandler.Position.Time.Hour,
+                   GpsHandler.Position.Time.Minute,
+                   GpsHandler.Position.Time.Seconds);
         } else {
-            printf("Error with error code:%d\r\n", sensors.gpsHandler.Status);
+            printf("Error:%d\r\n", sensors.gpsHandler.Status);
         }
-        vTaskDelayUntil(&StartTask, 500);
+        HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
+        vTaskDelayUntil(&StartTask, 1000);
+    }
+}
+
+void Control_task(void *pvParameters) {
+    for (;;) {
+        ControlStatus_t Status = Control_Process();
+        if (Status == CONTROL_OK) {
+        }
     }
 }
 /* USER CODE END 4 */

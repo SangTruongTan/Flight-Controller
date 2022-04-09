@@ -62,17 +62,17 @@ bool Detect_Char(RingHandler_t *RingHandler, const char Deli) {
     bool retval = false;
     uint8_t *Temp = NULL;
     int Availabe;
-    Temp = malloc(RING_BUFFER_SIZE);
-    if (Temp == NULL) return -1;
     Availabe = Is_available(RingHandler);
     if (Availabe > 0) {
+        Temp = malloc(RING_BUFFER_SIZE);
+        if (Temp == NULL) return -1;
         get_peek(RingHandler, Temp, Availabe);
         int Index = IndexOf(Temp, Deli, Availabe);
         if(Index != -1) {
             retval = true;
         }
+        free(Temp);
     }
-    free(Temp);
     return retval;
 }
 

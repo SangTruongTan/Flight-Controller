@@ -34,11 +34,21 @@ typedef enum Sensor_status_t {
     SENSOR_ERROR_GPS = 0x08U,
 } Sensor_status_t;
 
+typedef struct SensorParameters_t {
+    float Roll;
+    float Pitch;
+    float Yaw;
+    float VBat;
+    float Altitude;
+    GpsData_t Gps;
+} SensorParameters_t;
+
 typedef struct Sensor_handle_t {
     MPU6050_handle_t mpuHandler;
     HMC5883L_Handle_t hmcHandler;
     MS5611_Handle_t msHandler;
     GpsHandler_t gpsHandler;
+    SensorParameters_t Angle;
     I2C_HandleTypeDef *mshi2c;
     I2C_HandleTypeDef *mpuhi2c;
     I2C_HandleTypeDef *hmchi2c;
@@ -49,6 +59,9 @@ typedef struct Sensor_handle_t {
     bool enableGps;
     Sensor_status_t status;
 } Sensor_handle_t;
+
+/* Private definations -------------------------------------------------------*/
+#define dt 0.004f
 
 /* Private function prototypes -----------------------------------------------*/
 /**
@@ -74,4 +87,5 @@ Sensor_status_t sensors_update(Sensor_handle_t *Handle);
 
 Sensor_status_t Sensor_Gps_Update(Sensor_handle_t *Handler);
 
+void Sensor_Gyro_Calibration(Sensor_handle_t *Handler);
 #endif /* End of File */

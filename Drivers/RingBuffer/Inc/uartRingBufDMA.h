@@ -40,8 +40,8 @@
 #define uart2 USART3
 #define uart3 UART5
 
-#define RING_BUFFER_SIZE 512
-#define RING_RX_BUFFER 32
+#define RING_BUFFER_SIZE 2048
+#define RING_RX_BUFFER 64
 #define RING_TIMEOUT 5000  // ms
 /* Exported types ------------------------------------------------------------*/
 typedef struct RingHandler_t {

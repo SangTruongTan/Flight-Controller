@@ -107,7 +107,7 @@ void Error_Handler(void);
 #define MEMS_SDA_Pin GPIO_PIN_7
 #define MEMS_SDA_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
-
+#define MOTOR_CONFIG 0
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
