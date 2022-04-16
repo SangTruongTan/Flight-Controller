@@ -53,6 +53,7 @@ typedef enum ControlMode_t {
     ALTITUDE_HOLD_MODE = 2,
     GPS_HOLD_MODE = 3,
     RETURN_HOME_MODE = 4,
+    LOST_MODE = 5,
 } ControlMode_t;
 
 typedef struct ControlPid_t {

@@ -633,12 +633,12 @@ void Loop_task(void *pvParameters) {
             if (count > 10) {
                 // printf("%d,%d,%d,%d\r\n", PID.Motors.Esc_1, PID.Motors.Esc_2,
                 //        PID.Motors.Esc_3, PID.Motors.Esc_4);
-                printf("Remain Buffer:%d\r\n",
-                       Ring.Ring2.Head - Ring.Ring2.Tail);
-                int Av = Is_available(&Ring.Ring2);
-                if (Av > 100) {
-                    printf("Exceeds\r\n");
-                }
+                // printf("Remain Buffer:%d\r\n",
+                //        Ring.Ring2.Head - Ring.Ring2.Tail);
+                // int Av = Is_available(&Ring.Ring2);
+                // if (Av > 100) {
+                //     printf("Exceeds\r\n");
+                // }
                 count = 0;
             } else {
             }
@@ -674,10 +674,17 @@ void GPS_task(void *pvParameters) {
 
 void Control_task(void *pvParameters) {
     TickType_t StartTask = xTaskGetTickCount();
+    static int LostMonitoring = 0;
     for (;;) {
         ControlStatus_t Status = Control_Process();
+        LostMonitoring ++;
         if (Status == CONTROL_OK) {
             HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
+            LostMonitoring = 0;
+        }
+        //Lost Connection decide
+        if(LostMonitoring > 100 && Control.Mode != BLOCK_MODE) {
+            Control.Mode = LOST_MODE;
         }
         vTaskDelayUntil(&StartTask, 20);
     }

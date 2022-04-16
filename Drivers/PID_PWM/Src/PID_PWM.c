@@ -105,17 +105,27 @@ void PIDPWM_Process() {
     PID_Calculate(&Handle->PIDPitch);
     // Yaw PID's calculation.
     PID_Calculate(&Handle->PIDYaw);
-    //Check for I controller when the Drone isn't start yet.
-    if(Handle->Motors.Throttle < 1010) {
+    // Check for I controller when the Drone isn't start yet.
+    if (Handle->Motors.Throttle < 1010) {
         Handle->PIDRoll.IMem = 0;
         Handle->PIDPitch.IMem = 0;
         Handle->PIDYaw.IMem = 0;
     }
     // Process for PWM
+    // Detect the Drone Crash
+    if ((abs(Handle->Angle->GyroAxis.pitch) > 75 ||
+         abs(Handle->Angle->GyroAxis.roll) > 75) &&
+        *Handle->Mode == LOST_MODE)
+        *Handle->Mode = BLOCK_MODE;
     // Put the Throttle calculation here
-    Handle->Motors.Throttle = Handle->Control->JoyStick.Thrust;
+    // Check LOST connection Mode
+    if (*Handle->Mode == LOST_MODE)
+        Handle->Motors.Throttle = 1080;
+    else
+        Handle->Motors.Throttle = Handle->Control->JoyStick.Thrust;
+
     if (*Handle->Mode != BLOCK_MODE &&
-        Handle->Control->JoyStick.Thrust > 1030) {
+        Handle->Control->JoyStick.Thrust > 1010) {
         if (Handle->Motors.Throttle > 1800) Handle->Motors.Throttle = 1800;
         Handle->Motors.Esc_1 = Handle->Motors.Throttle -
                                Handle->PIDPitch.Output +
@@ -149,15 +159,11 @@ void PIDPWM_Process() {
         } else if (Handle->Motors.Esc_4 > 2000) {
             Handle->Motors.Esc_4 = 2000;
         }
-        if(Handle->Control->JoyStick.Thrust > 1030) {
-            if(Handle->Motors.Esc_1 < 1100)
-                Handle->Motors.Esc_1 = 1100;
-            if(Handle->Motors.Esc_2 < 1100)
-                Handle->Motors.Esc_2 = 1100;
-            if(Handle->Motors.Esc_3 < 1100)
-                Handle->Motors.Esc_3 = 1100;
-            if(Handle->Motors.Esc_4 < 1100)
-                Handle->Motors.Esc_4 = 1100;
+        if (Handle->Control->JoyStick.Thrust > 1010) {
+            if (Handle->Motors.Esc_1 < 1100) Handle->Motors.Esc_1 = 1100;
+            if (Handle->Motors.Esc_2 < 1100) Handle->Motors.Esc_2 = 1100;
+            if (Handle->Motors.Esc_3 < 1100) Handle->Motors.Esc_3 = 1100;
+            if (Handle->Motors.Esc_4 < 1100) Handle->Motors.Esc_4 = 1100;
         }
     } else {
         Handle->Motors.Esc_1 = 1000;
