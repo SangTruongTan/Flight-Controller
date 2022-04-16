@@ -194,10 +194,10 @@ int main(void) {
     ControlInit.Joystick.Yaw = 1500;
     ControlInit.Joystick.Thrust = 1000;
     ControlInit.ControlPid.Pitch.P = 1.3;
-    ControlInit.ControlPid.Pitch.I = 0.00;
+    ControlInit.ControlPid.Pitch.I = 0.04;
     ControlInit.ControlPid.Pitch.D = 18.0;
     ControlInit.ControlPid.Roll.P = 1.3;
-    ControlInit.ControlPid.Roll.I = 0.0;
+    ControlInit.ControlPid.Roll.I = 0.04;
     ControlInit.ControlPid.Roll.D = 18.0;
     ControlInit.ControlPid.Yaw.P = 4;
     ControlInit.ControlPid.Yaw.I = 0.02;

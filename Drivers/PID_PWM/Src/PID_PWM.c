@@ -105,6 +105,12 @@ void PIDPWM_Process() {
     PID_Calculate(&Handle->PIDPitch);
     // Yaw PID's calculation.
     PID_Calculate(&Handle->PIDYaw);
+    //Check for I controller when the Drone isn't start yet.
+    if(Handle->Motors.Throttle < 1010) {
+        Handle->PIDRoll.IMem = 0;
+        Handle->PIDPitch.IMem = 0;
+        Handle->PIDYaw.IMem = 0;
+    }
     // Process for PWM
     // Put the Throttle calculation here
     Handle->Motors.Throttle = Handle->Control->JoyStick.Thrust;
@@ -142,6 +148,16 @@ void PIDPWM_Process() {
             Handle->Motors.Esc_4 = 1000;
         } else if (Handle->Motors.Esc_4 > 2000) {
             Handle->Motors.Esc_4 = 2000;
+        }
+        if(Handle->Control->JoyStick.Thrust > 1030) {
+            if(Handle->Motors.Esc_1 < 1100)
+                Handle->Motors.Esc_1 = 1100;
+            if(Handle->Motors.Esc_2 < 1100)
+                Handle->Motors.Esc_2 = 1100;
+            if(Handle->Motors.Esc_3 < 1100)
+                Handle->Motors.Esc_3 = 1100;
+            if(Handle->Motors.Esc_4 < 1100)
+                Handle->Motors.Esc_4 = 1100;
         }
     } else {
         Handle->Motors.Esc_1 = 1000;
