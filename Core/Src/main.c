@@ -152,17 +152,17 @@ int main(void) {
     HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_2);
     HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_3);
     HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_4);
-    #if MOTOR_CONFIG == 0
+#if MOTOR_CONFIG == 0
     htim5.Instance->CCR1 = 1000;
     htim5.Instance->CCR2 = 1000;
     htim5.Instance->CCR3 = 1000;
     htim5.Instance->CCR4 = 1000;
-    #else
+#else
     htim5.Instance->CCR1 = 2000;
     htim5.Instance->CCR2 = 2000;
     htim5.Instance->CCR3 = 2000;
     htim5.Instance->CCR4 = 2000;
-    #endif
+#endif
     HAL_Delay(200);
     // Init for Ring Buffer. Must be called first
     Ring.Ring1.enable = true;
@@ -181,12 +181,12 @@ int main(void) {
     sensors.mshi2c = &hi2c1;
     sensors.gpsRing = &Ring.Ring3;
     sensors.msHandler.wait = vTaskDelay;
-    // Init for Remote Control
-    #if MOTOR_CONFIG == 0
+// Init for Remote Control
+#if MOTOR_CONFIG == 0
     ControlInit.Mode = BLOCK_MODE;
-    #else
+#else
     ControlInit.Mode = MANUAL_MODE;
-    #endif
+#endif
 
     ControlInit.Serial = &Ring.Ring2;
     ControlInit.Joystick.Pitch = 1500;
@@ -631,8 +631,14 @@ void Loop_task(void *pvParameters) {
             printf("The Sensors error:%d\r\n", sensors.status);
         } else {
             if (count > 10) {
-                printf("%d,%d,%d,%d\r\n", PID.Motors.Esc_1, PID.Motors.Esc_2,
-                       PID.Motors.Esc_3, PID.Motors.Esc_4);
+                // printf("%d,%d,%d,%d\r\n", PID.Motors.Esc_1, PID.Motors.Esc_2,
+                //        PID.Motors.Esc_3, PID.Motors.Esc_4);
+                printf("Remain Buffer:%d\r\n",
+                       Ring.Ring2.Head - Ring.Ring2.Tail);
+                int Av = Is_available(&Ring.Ring2);
+                if (Av > 100) {
+                    printf("Exceeds\r\n");
+                }
                 count = 0;
             } else {
             }
@@ -667,10 +673,13 @@ void GPS_task(void *pvParameters) {
 }
 
 void Control_task(void *pvParameters) {
+    TickType_t StartTask = xTaskGetTickCount();
     for (;;) {
         ControlStatus_t Status = Control_Process();
         if (Status == CONTROL_OK) {
+            HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
         }
+        vTaskDelayUntil(&StartTask, 20);
     }
 }
 /* USER CODE END 4 */
