@@ -1,22 +1,22 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : RemoteControl.h
-  * @brief          : Header for RemoteControl.c file.
-  *                   This file contains the common defines of the application.
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2022 Sang Tan Truong.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : RemoteControl.h
+ * @brief          : Header for RemoteControl.c file.
+ *                   This file contains the common defines of the application.
+ ******************************************************************************
+ * @attention
+ *
+ * <h2><center>&copy; Copyright (c) 2022 Sang Tan Truong.
+ * All rights reserved.</center></h2>
+ *
+ * This software component is licensed by ST under BSD 3-Clause license,
+ * the "License"; You may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *                        opensource.org/licenses/BSD-3-Clause
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
@@ -24,6 +24,10 @@
 #define __REMOTECONTROL_H_
 
 /* Includes ------------------------------------------------------------------*/
+#include <stdio.h>
+#include <string.h>
+
+#include "sensors.h"
 #include "uartRingBufDMA.h"
 
 /* Exported types ------------------------------------------------------------*/
@@ -74,6 +78,7 @@ typedef struct ControlInit_t {
     ControlPid_t ControlPid;
     ControlMode_t Mode;
     Joystick_t Joystick;
+    SensorParameters_t *SensorsParameter;
 } ControlInit_t;
 
 typedef struct ControlHandler_t {
@@ -82,6 +87,7 @@ typedef struct ControlHandler_t {
     ControlMode_t Mode;
     ControlInfo_t Control;
     ControlStatus_t Status;
+    SensorParameters_t *SensorsParameter;
 } ControlHandler_t;
 
 /* Exported constants --------------------------------------------------------*/
@@ -91,7 +97,11 @@ typedef struct ControlHandler_t {
 /* Exported functions prototypes ---------------------------------------------*/
 void Control_Init(ControlHandler_t *Handler, ControlInit_t Init);
 ControlStatus_t Control_Process(void);
-/* Exported defines -----------------------------------------------------------*/
+void Control_Feedback_VBat(void);
+void Control_Feedback_Mode(void);
+void Control_Feedback_Angle(void);
 
+/* Exported defines
+ * -----------------------------------------------------------*/
 
-#endif  /* __REMOTECONTROL_H_ */
+#endif /* __REMOTECONTROL_H_ */

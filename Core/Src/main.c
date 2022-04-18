@@ -75,12 +75,15 @@ TaskHandle_t DefaultTask;
 TaskHandle_t LoopTask;
 TaskHandle_t GpsTask;
 TaskHandle_t ControlTask;
+TaskHandle_t FeedbackTask;
 
 RingBuffer_t Ring;
 Sensor_handle_t sensors;
 ControlHandler_t Control;
 ControlInit_t ControlInit;
 PIDPWMHandle_t PID;
+
+uint16_t AdcBatValue;
 
 /* USER CODE END PV */
 
@@ -102,6 +105,7 @@ void Default_task(void *pvParameters);
 void Loop_task(void *pvParameters);
 void GPS_task(void *pvParameters);
 void Control_task(void *pvParameters);
+void Feedback_task(void *pvParameters);
 
 /* USER CODE END PFP */
 
@@ -148,6 +152,7 @@ int main(void) {
     MX_USART3_UART_Init();
     MX_UART5_Init();
     /* USER CODE BEGIN 2 */
+    HAL_ADC_Start_DMA(&hadc1, (uint32_t *)&AdcBatValue, 1);
     HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_1);
     HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_2);
     HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_3);
@@ -181,13 +186,15 @@ int main(void) {
     sensors.mshi2c = &hi2c1;
     sensors.gpsRing = &Ring.Ring3;
     sensors.msHandler.wait = vTaskDelay;
+    // Init for ADC Battery Voltage reading
+    sensors.AdcBat = &AdcBatValue;
 // Init for Remote Control
 #if MOTOR_CONFIG == 0
     ControlInit.Mode = BLOCK_MODE;
 #else
     ControlInit.Mode = MANUAL_MODE;
 #endif
-
+    ControlInit.SensorsParameter = &sensors.Angle;
     ControlInit.Serial = &Ring.Ring2;
     ControlInit.Joystick.Pitch = 1500;
     ControlInit.Joystick.Roll = 1500;
@@ -219,7 +226,6 @@ int main(void) {
     // Init PID
     PIDPWM_Init(&PID);
 
-    HAL_Delay(1000);
     if (sensors.status != SENSOR_OK) {
         HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, 0);
         printf("Sensors error:%d\r\n", sensors.status);
@@ -311,14 +317,14 @@ static void MX_ADC1_Init(void) {
     hadc1.Instance = ADC1;
     hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
     hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-    hadc1.Init.ScanConvMode = DISABLE;
-    hadc1.Init.ContinuousConvMode = DISABLE;
+    hadc1.Init.ScanConvMode = ENABLE;
+    hadc1.Init.ContinuousConvMode = ENABLE;
     hadc1.Init.DiscontinuousConvMode = DISABLE;
     hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
     hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
     hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
     hadc1.Init.NbrOfConversion = 1;
-    hadc1.Init.DMAContinuousRequests = DISABLE;
+    hadc1.Init.DMAContinuousRequests = ENABLE;
     hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
     if (HAL_ADC_Init(&hadc1) != HAL_OK) {
         Error_Handler();
@@ -615,6 +621,7 @@ void Default_task(void *pvParameters) {
     // xTaskCreate(&GPS_task, "Gps", 512, NULL, 2, &GpsTask);
     xTaskCreate(&Loop_task, "Loop", 256, NULL, 3, &LoopTask);
     xTaskCreate(&Control_task, "Control", 256, NULL, 2, &ControlTask);
+    xTaskCreate(&Feedback_task, "FeedBack", 256, NULL, 2, &FeedbackTask);
     vTaskDelete(DefaultTask);
     for (;;) {
     }
@@ -631,15 +638,9 @@ void Loop_task(void *pvParameters) {
             printf("The Sensors error:%d\r\n", sensors.status);
         } else {
             if (count > 10) {
-                // printf("%d,%d,%d,%d\r\n", PID.Motors.Esc_1, PID.Motors.Esc_2,
-                //        PID.Motors.Esc_3, PID.Motors.Esc_4);
-                // printf("Remain Buffer:%d\r\n",
-                //        Ring.Ring2.Head - Ring.Ring2.Tail);
-                // int Av = Is_available(&Ring.Ring2);
-                // if (Av > 100) {
-                //     printf("Exceeds\r\n");
-                // }
+                // printf("Adc:%d, V= %f\r\n", AdcBatValue, sensors.Angle.VBat);
                 count = 0;
+                HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
             } else {
             }
         }
@@ -673,22 +674,49 @@ void GPS_task(void *pvParameters) {
 }
 
 void Control_task(void *pvParameters) {
+    static int count = 0;
     TickType_t StartTask = xTaskGetTickCount();
     static int LostMonitoring = 0;
     for (;;) {
         ControlStatus_t Status = Control_Process();
-        LostMonitoring ++;
+        LostMonitoring++;
         if (Status == CONTROL_OK) {
-            HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
+            count++;
+            if (count > 10) {
+                count = 0;
+                HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
+                printf("%d,%d,%d,%d\r\n", PID.Motors.Esc_1, PID.Motors.Esc_2,
+                       PID.Motors.Esc_3, PID.Motors.Esc_4);
+            }
             LostMonitoring = 0;
         }
-        //Lost Connection decide
-        if(LostMonitoring > 100 && Control.Mode != BLOCK_MODE) {
+        // Lost Connection decide
+        if (LostMonitoring > 100 && Control.Mode != BLOCK_MODE) {
             Control.Mode = LOST_MODE;
         }
-        vTaskDelayUntil(&StartTask, 20);
+        vTaskDelayUntil(&StartTask, 10);
     }
 }
+
+void Feedback_task(void *pvParameters) {
+    uint8_t AckId = 0;
+    TickType_t StartTask = xTaskGetTickCount();
+    vTaskDelay(200);
+    for (;;) {
+        if (AckId == 0) {
+            Control_Feedback_Mode();
+            AckId++;
+        } else if (AckId == 1) {
+            Control_Feedback_VBat();
+            AckId++;
+        } else if (AckId == 2) {
+            Control_Feedback_Angle();
+            AckId = 0;
+        }
+        vTaskDelayUntil(&StartTask, 200);
+    }
+}
+
 /* USER CODE END 4 */
 
 /**

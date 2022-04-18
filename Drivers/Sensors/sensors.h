@@ -58,6 +58,7 @@ typedef struct Sensor_handle_t {
     bool enableMS;
     bool enableGps;
     Sensor_status_t status;
+    uint16_t *AdcBat;
 } Sensor_handle_t;
 
 /* Private definations -------------------------------------------------------*/

@@ -48,8 +48,15 @@ void PIDPWM_Init(PIDPWMHandle_t *HandleInit) {
 }
 
 void PIDPWM_Process() {
-    Handle->SetPointBase.Pitch = Handle->Control->JoyStick.Pitch;
-    Handle->SetPointBase.Roll = Handle->Control->JoyStick.Roll;
+    // Check LOST connection Mode
+    if (*Handle->Mode == LOST_MODE) {
+        Handle->SetPointBase.Pitch = 0;
+        Handle->SetPointBase.Roll = 0;
+    } else {
+        Handle->SetPointBase.Pitch = Handle->Control->JoyStick.Pitch;
+        Handle->SetPointBase.Roll = Handle->Control->JoyStick.Roll;
+    }
+
     // Put heading lock here
     // Put the GPS control here
     // Limit the range
@@ -119,8 +126,10 @@ void PIDPWM_Process() {
         *Handle->Mode = BLOCK_MODE;
     // Put the Throttle calculation here
     // Check LOST connection Mode
-    if (*Handle->Mode == LOST_MODE)
+    if (*Handle->Mode == LOST_MODE) {
         Handle->Motors.Throttle = 1080;
+    }
+
     else
         Handle->Motors.Throttle = Handle->Control->JoyStick.Thrust;
 

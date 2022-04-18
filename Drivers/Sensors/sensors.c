@@ -88,7 +88,8 @@ Sensor_status_t sensors_init(Sensor_handle_t *Handle) {
         }
     }
     // Call the Gps module Init function
-
+    // Calculate Battery Voltage
+    Handle->Angle.VBat = (*Handle->AdcBat) * 36.3 / 4016;
     return *SenStatus;
 }
 
@@ -110,13 +111,17 @@ Sensor_status_t sensors_update(Sensor_handle_t *Handle) {
         if (State != MPU6050_OK_STATE) {
             *SenStatus |= SENSOR_ERROR_MPU;
         } else {
-            //Put the compass heading here
-            //Complementary filter
-            Axis->pitch = 0.9996*Axis->pitch + 0.0004* Acc->pitch;
-            Axis->roll = 0.9996*Axis->roll + 0.0004* Acc->roll;
-            //Calculate the angle with the adjustment
+            // Put the compass heading here
+            // Complementary filter
+            Axis->pitch = 0.9996 * Axis->pitch + 0.0004 * Acc->pitch;
+            Axis->roll = 0.9996 * Axis->roll + 0.0004 * Acc->roll;
+            // Calculate the angle with the adjustment
             Adj->pitch = Axis->pitch * 15;
             Adj->roll = Axis->roll * 15;
+            //Assign for sensors Parameter
+            Handle->Angle.Pitch = Axis->pitch;
+            Handle->Angle.Roll = Axis->roll;
+            Handle->Angle.Yaw = Axis->yaw;
         }
     }
     // Get the hmc data
@@ -130,8 +135,10 @@ Sensor_status_t sensors_update(Sensor_handle_t *Handle) {
         status = MS5611_Update(&Handle->msHandler);
         if (status != MS5611_OK) *SenStatus |= SENSOR_ERROR_MS;
     }
-    if(*SenStatus == SENSOR_OK) {
-        
+    // Calculate Battery Voltage
+    Handle->Angle.VBat =
+        0.92 * Handle->Angle.VBat + 0.08 * (*Handle->AdcBat) * 36.3 / 4016;
+    if (*SenStatus == SENSOR_OK) {
     }
     return SENSOR_OK;
 }
@@ -159,17 +166,17 @@ void Sensor_Gyro_Calibration(Sensor_handle_t *Handler) {
     int32_t y = 0;
     int32_t z = 0;
     uint32_t TickStart;
-    for(int i = 0; i < 2000; i++) {
+    for (int i = 0; i < 2000; i++) {
         TickStart = HAL_GetTick();
         MPU6050_GyroRead_Raw(&Handler->mpuHandler);
         x += Handler->mpuHandler.GyroRaw.x;
         y += Handler->mpuHandler.GyroRaw.y;
         z += Handler->mpuHandler.GyroRaw.z;
-        if(i % 25 == 0)
-        HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
-        while(HAL_GetTick() < TickStart + 3);
+        if (i % 25 == 0) HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+        while (HAL_GetTick() < TickStart + 3)
+            ;
     }
-    Handler->mpuHandler.GyroOffset.x = x/2000;
-    Handler->mpuHandler.GyroOffset.y = y/2000;
-    Handler->mpuHandler.GyroOffset.z = z/2000;
+    Handler->mpuHandler.GyroOffset.x = x / 2000;
+    Handler->mpuHandler.GyroOffset.y = y / 2000;
+    Handler->mpuHandler.GyroOffset.z = z / 2000;
 }

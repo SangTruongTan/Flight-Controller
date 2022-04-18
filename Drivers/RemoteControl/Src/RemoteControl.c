@@ -28,8 +28,8 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define ROWS 12
-#define COLUMNS 16
+#define CONTROL_ROWS 12
+#define CONTROL_COLUMNS 16
 
 /* Private macro -------------------------------------------------------------*/
 
@@ -37,17 +37,17 @@
 ControlHandler_t *ControlHandler;
 
 /* Private function prototypes -----------------------------------------------*/
-int Control_Parse(uint8_t (*TempBuffer)[COLUMNS], uint8_t *Source,
+int Control_Parse(uint8_t (*TempBuffer)[CONTROL_COLUMNS], uint8_t *Source,
                   const char Deli);
 
 ControlStatus_t Decode_CMD(ControlInfo_t *Control,
-                           uint8_t (*StructBuffer)[COLUMNS]);
+                           uint8_t (*StructBuffer)[CONTROL_COLUMNS]);
 
 ControlStatus_t Decode_PID(ControlInfo_t *Control,
-                           uint8_t (*StructBuffer)[COLUMNS]);
+                           uint8_t (*StructBuffer)[CONTROL_COLUMNS]);
 
 ControlStatus_t Decode_Mode(ControlMode_t *Mode,
-                            uint8_t (*StructBuffer)[COLUMNS]);
+                            uint8_t (*StructBuffer)[CONTROL_COLUMNS]);
 
 /* Private function definations ----------------------------------------------*/
 /**
@@ -57,7 +57,7 @@ ControlStatus_t Decode_Mode(ControlMode_t *Mode,
  * @param Deli the delimiter.
  * @retval int The number of split string.
  */
-int Control_Parse(uint8_t (*TempBuffer)[COLUMNS], uint8_t *Source,
+int Control_Parse(uint8_t (*TempBuffer)[CONTROL_COLUMNS], uint8_t *Source,
                   const char Deli) {
     int length = 0;
     char *Head = malloc(32);
@@ -78,7 +78,7 @@ int Control_Parse(uint8_t (*TempBuffer)[COLUMNS], uint8_t *Source,
  * @retval ControlStatus_t
  */
 ControlStatus_t Decode_CMD(ControlInfo_t *Control,
-                           uint8_t (*StructBuffer)[COLUMNS]) {
+                           uint8_t (*StructBuffer)[CONTROL_COLUMNS]) {
     int index = 1;
     if (strcmp((const char *)&StructBuffer[0], "CMD") != 0)
         return CONTROL_ERROR;
@@ -123,7 +123,7 @@ ControlStatus_t Decode_CMD(ControlInfo_t *Control,
  * @retval ControlStatus_t
  */
 ControlStatus_t Decode_PID(ControlInfo_t *Control,
-                           uint8_t (*StructBuffer)[COLUMNS]) {
+                           uint8_t (*StructBuffer)[CONTROL_COLUMNS]) {
     int index = 1;
     if (strcmp((const char *)&StructBuffer[0], "PID") != 0)
         return CONTROL_ERROR;
@@ -186,7 +186,7 @@ ControlStatus_t Decode_PID(ControlInfo_t *Control,
  * @retval ControlStatus_t
  */
 ControlStatus_t Decode_Mode(ControlMode_t *Mode,
-                            uint8_t (*StructBuffer)[COLUMNS]) {
+                            uint8_t (*StructBuffer)[CONTROL_COLUMNS]) {
     if (strcmp((const char *)&StructBuffer[0], "MOD") != 0)
         return CONTROL_ERROR;
     if (strcmp((const char *)&StructBuffer[1], "MANUAL") == 0) {
@@ -217,6 +217,8 @@ void Control_Init(ControlHandler_t *Handler, ControlInit_t Init) {
            sizeof(Init.ControlPid));
     memcpy(&Handler->Control.JoyStick, &Init.Joystick, sizeof(Init.Joystick));
     Handler->Serial = Init.Serial;
+    // Copy the sensors parameter attribute
+    Handler->SensorsParameter = Init.SensorsParameter;
     // Assign the Handler to the Handler of the file
     ControlHandler = Handler;
 }
@@ -228,7 +230,7 @@ void Control_Init(ControlHandler_t *Handler, ControlInit_t Init) {
 ControlStatus_t Control_Process(void) {
     uint8_t *Buffer;
     uint8_t *Buffer1;
-    uint8_t StructBuffer[ROWS][COLUMNS];
+    uint8_t StructBuffer[CONTROL_ROWS][CONTROL_COLUMNS];
     ControlStatus_t Status = CONTROL_ERROR;
     if (Detect_Char(ControlHandler->Serial, '\n')) {
         Buffer = malloc(128);
@@ -261,4 +263,57 @@ ControlStatus_t Control_Process(void) {
         free(Buffer1);
     }
     return Status;
+}
+
+void Control_Feedback_VBat(void) {
+    char *Buffer;
+    Buffer = malloc(32);
+    sprintf(Buffer, "ACK,B,%04.2f\n", ControlHandler->SensorsParameter->VBat);
+    HAL_UART_Transmit(ControlHandler->Serial->huart, (uint8_t *)Buffer,
+                      strlen(Buffer), 100);
+    free(Buffer);
+}
+
+void Control_Feedback_Angle(void) {
+    char *Buffer;
+    Buffer = malloc(32);
+    sprintf(Buffer, "ACK,R,%04.1f,P,%04.1f,Y,%04.1f\n",
+            ControlHandler->SensorsParameter->Roll,
+            ControlHandler->SensorsParameter->Pitch,
+            ControlHandler->SensorsParameter->Yaw);
+    HAL_UART_Transmit(ControlHandler->Serial->huart, (uint8_t *)Buffer,
+                      strlen(Buffer), 100);
+    free(Buffer);
+}
+
+void Control_Feedback_Mode(void) {
+    char *Buffer;
+    char Mode[10];
+    Buffer = malloc(32);
+    switch (ControlHandler->Mode) {
+        case BLOCK_MODE:
+            sprintf(Mode, "BLOCK");
+            break;
+        case MANUAL_MODE:
+            sprintf(Mode, "MANUAL");
+            break;
+        case ALTITUDE_HOLD_MODE:
+            sprintf(Mode, "ALTITUDE");
+            break;
+        case GPS_HOLD_MODE:
+            sprintf(Mode, "GPS");
+            break;
+        case RETURN_HOME_MODE:
+            sprintf(Mode, "HOME");
+            break;
+        case LOST_MODE:
+            sprintf(Mode, "LOST");
+            break;
+        default:
+            break;
+    }
+    sprintf(Buffer, "MOD,%s\n", Mode);
+    HAL_UART_Transmit(ControlHandler->Serial->huart, (uint8_t *)Buffer,
+                      strlen(Buffer), 100);
+    free(Buffer);
 }
