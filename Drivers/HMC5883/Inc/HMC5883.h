@@ -57,6 +57,22 @@ typedef struct HMC5883L_Scaled_t {
     float z;
 } HMC5883L_Scaled_t;
 
+typedef struct HMC5883L_Offset_Scale_t {
+    float scale_y;
+    float scale_z;
+    int16_t offset_x;
+    int16_t offset_y;
+    int16_t offset_z;
+    float declination;
+    int16_t compass_cal_values[6];
+} HMC5883L_Offset_Scale_t;
+
+typedef struct HMC5833L_Compass_Data_t {
+    float x_horizontal;
+    float y_horizontal;
+    float actual_heading;
+} HMC5833L_Compass_Data_t;
+
 typedef struct HMC5883L_Handle_t {
     I2C_HandleTypeDef hi2c;
     HMC5883L_Status_t Status;
@@ -64,6 +80,8 @@ typedef struct HMC5883L_Handle_t {
     HMC5883L_Init_t Init;
     HMC5883L_Raw_t Raw;
     HMC5883L_Scaled_t Scaled;
+    HMC5883L_Offset_Scale_t OffsetScale;
+    HMC5833L_Compass_Data_t CompassData;
     float Resolution;
 } HMC5883L_Handle_t;
 
@@ -203,5 +221,7 @@ HMC5883L_Status_t HMC5883L_Get_Scaled(HMC5883L_Handle_t *Handle);
  */
 HMC5883L_State_t HMC5883L_Init(HMC5883L_Handle_t *Handle,
                                I2C_HandleTypeDef *I2c);
+
+HMC5883L_Status_t HMC5883L_Update(HMC5883L_Handle_t *Handle);
 
 #endif /* End of File */
