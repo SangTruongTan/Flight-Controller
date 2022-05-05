@@ -71,6 +71,7 @@ typedef struct ControlPid_t {
 typedef struct ControlInfo_t {
     Joystick_t JoyStick;
     ControlPid_t ControlPid;
+    bool HeadingLock;
 } ControlInfo_t;
 
 typedef struct ControlInit_t {

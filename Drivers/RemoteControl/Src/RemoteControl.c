@@ -236,6 +236,7 @@ ControlStatus_t Control_Process(void) {
         Buffer = malloc(128);
         Buffer1 = malloc(128);
         memset(Buffer1, '\0', 128);
+        memset(Buffer, '\0', 128);
         while (Get_String_NonBlocking(ControlHandler->Serial, Buffer, '\n') >
                0) {
             strcpy((char *)Buffer1, (char *)Buffer);

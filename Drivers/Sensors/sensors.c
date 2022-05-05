@@ -18,7 +18,14 @@ by this software, read more about this on the GNU General Public License.
 /* Private includes ----------------------------------------------------------*/
 #include "sensors.h"
 
+/* Private defines -----------------------------------------------------------*/
+#define PHI_DIV_180 0.0174533
+
 /* Private variables ---------------------------------------------------------*/
+
+/* Private functions declaration
+ * ----------------------------------------------*/
+void Sensor_compass_calculate_offset(HMC5883L_Offset_Scale_t *OffsetScale);
 
 /* Function definations ------------------------------------------------------*/
 /**
@@ -29,10 +36,10 @@ by this software, read more about this on the GNU General Public License.
 void sensors_user_modify(Sensor_handle_t *Handle) {
     /* USER CODE BEGIN */
     // Enable the sensors
-    Handle->enableHMC = false;
+    Handle->enableHMC = true;
     Handle->enableMPU = true;
     Handle->enableMS = false;
-    Handle->enableGps = true;
+    Handle->enableGps = false;
     // Init for the MPU
     Handle->mpuHandler.Init.ui8AcceFullScale = MPU6050_ACCE_FULLSCALE_8G;
     Handle->mpuHandler.Init.ui8GyroFullScale = MPU6050_GYRO_FULLSCALE_500DPS;
@@ -79,6 +86,7 @@ Sensor_status_t sensors_init(Sensor_handle_t *Handle) {
         if (hmcState != HMC5883L_OK_STATE) {
             *SenStatus |= SENSOR_ERROR_HMC;
         }
+        Sensor_compass_calculate_offset(&Handle->hmcHandler.OffsetScale);
     }
     // Call the ms5611 init function
     if (Handle->enableMS == true) {
@@ -90,6 +98,11 @@ Sensor_status_t sensors_init(Sensor_handle_t *Handle) {
     // Call the Gps module Init function
     // Calculate Battery Voltage
     Handle->Angle.VBat = (*Handle->AdcBat) * 36.3 / 4016;
+    if (Handle->status == SENSOR_OK) {
+        sensors_update(Handle);
+        Handle->mpuHandler.GyroAxis.yaw =
+            Handle->hmcHandler.CompassData.actual_heading;
+    }
     return *SenStatus;
 }
 
@@ -118,7 +131,7 @@ Sensor_status_t sensors_update(Sensor_handle_t *Handle) {
             // Calculate the angle with the adjustment
             Adj->pitch = Axis->pitch * 15;
             Adj->roll = Axis->roll * 15;
-            //Assign for sensors Parameter
+            // Assign for sensors Parameter
             Handle->Angle.Pitch = Axis->pitch;
             Handle->Angle.Roll = Axis->roll;
             Handle->Angle.Yaw = Axis->yaw;
@@ -126,8 +139,50 @@ Sensor_status_t sensors_update(Sensor_handle_t *Handle) {
     }
     // Get the hmc data
     if (Handle->enableHMC == true) {
-        HMC5883L_Status_t status = HMC5883L_Get_Scaled(&Handle->hmcHandler);
+        HMC5883L_Status_t status = HMC5883L_Update(&Handle->hmcHandler);
         if (status != HMC5883L_OK) *SenStatus |= SENSOR_ERROR_HMC;
+        // Calcute horizontal compass value
+        Handle->hmcHandler.CompassData.x_horizontal =
+            (float)Handle->hmcHandler.Raw.x *
+                cos(Handle->Angle.Pitch * -PHI_DIV_180) +
+            (float)Handle->hmcHandler.Raw.y *
+                sin(Handle->Angle.Roll * PHI_DIV_180) *
+                sin(Handle->Angle.Pitch * -PHI_DIV_180) -
+            (float)Handle->hmcHandler.Raw.z *
+                cos(Handle->Angle.Roll * PHI_DIV_180) *
+                sin(Handle->Angle.Pitch * -PHI_DIV_180);
+        Handle->hmcHandler.CompassData.y_horizontal =
+            (float)Handle->hmcHandler.Raw.y *
+                cos(Handle->Angle.Roll * PHI_DIV_180) +
+            (float)Handle->hmcHandler.Raw.z *
+                sin(Handle->Angle.Roll * PHI_DIV_180);
+        // Calculate actual heading
+        if (Handle->hmcHandler.CompassData.y_horizontal < 0)
+            Handle->hmcHandler.CompassData.actual_heading =
+                180 +
+                (180 + ((atan2(Handle->hmcHandler.CompassData.y_horizontal,
+                               Handle->hmcHandler.CompassData.x_horizontal)) *
+                        (180 / 3.14)));
+        else
+            Handle->hmcHandler.CompassData.actual_heading =
+                ((atan2(Handle->hmcHandler.CompassData.y_horizontal,
+                        Handle->hmcHandler.CompassData.x_horizontal)) *
+                 (180 / 3.14));
+        Handle->hmcHandler.CompassData.actual_heading +=
+            Handle->hmcHandler.OffsetScale.declination;
+        if (Handle->hmcHandler.CompassData.actual_heading < 0)
+            Handle->hmcHandler.CompassData.actual_heading += 360;
+        else if (Handle->hmcHandler.CompassData.actual_heading >= 360)
+            Handle->hmcHandler.CompassData.actual_heading -= 360;
+        // Calculate angle yaw with the compass value
+        Handle->mpuHandler.GyroAxis.yaw -=
+            course_deviation(Handle->mpuHandler.GyroAxis.yaw,
+                             Handle->hmcHandler.CompassData.actual_heading) /
+            1200.0;
+        if (Handle->mpuHandler.GyroAxis.yaw < 0)
+            Handle->mpuHandler.GyroAxis.yaw += 360;
+        else if (Handle->mpuHandler.GyroAxis.yaw >= 360)
+            Handle->mpuHandler.GyroAxis.yaw -= 360;
     }
     // Get the pressure sensor data
     if (Handle->enableMS == true) {
@@ -165,18 +220,94 @@ void Sensor_Gyro_Calibration(Sensor_handle_t *Handler) {
     int32_t x = 0;
     int32_t y = 0;
     int32_t z = 0;
-    uint32_t TickStart;
     for (int i = 0; i < 2000; i++) {
-        TickStart = HAL_GetTick();
         MPU6050_GyroRead_Raw(&Handler->mpuHandler);
         x += Handler->mpuHandler.GyroRaw.x;
         y += Handler->mpuHandler.GyroRaw.y;
         z += Handler->mpuHandler.GyroRaw.z;
         if (i % 25 == 0) HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
-        while (HAL_GetTick() < TickStart + 3)
-            ;
+        Handler->Calibration.waitUntil(&Handler->Calibration.StartTask, 4);
     }
     Handler->mpuHandler.GyroOffset.x = x / 2000;
     Handler->mpuHandler.GyroOffset.y = y / 2000;
     Handler->mpuHandler.GyroOffset.z = z / 2000;
+    // Put the calibration value to the Flash here
+}
+
+void Sensor_Compass_Calibration(Sensor_handle_t *Handler) {
+    int16_t compass_cal_values[6];
+    uint32_t i = 0;
+    HMC5883L_Raw_t *Raw = &Handler->hmcHandler.Raw;
+    memset(compass_cal_values, 0, 6 * sizeof(int16_t));
+    while (*Handler->Calibration.ThrustChannel > 1800) {
+        if (HMC5883L_Get_Raw(&Handler->hmcHandler) != HMC5883L_OK) return;
+        if (Raw->x < compass_cal_values[0])
+            compass_cal_values[0] = Raw->x;  // Min X
+        if (Raw->x > compass_cal_values[1])
+            compass_cal_values[1] = Raw->x;  // Max X
+        if (Raw->y < compass_cal_values[2])
+            compass_cal_values[2] = Raw->y;  // Min Y
+        if (Raw->y > compass_cal_values[3])
+            compass_cal_values[3] = Raw->y;  // Max Y
+        if (Raw->z < compass_cal_values[4])
+            compass_cal_values[4] = Raw->z;  // Min Z
+        if (Raw->z > compass_cal_values[5])
+            compass_cal_values[5] = Raw->z;  // Max Z
+        if (i % 25 == 0) HAL_GPIO_TogglePin(LED4_GPIO_Port, LED4_Pin);
+        i++;
+        Handler->Calibration.waitUntil(&Handler->Calibration.StartTask, 4);
+    }
+    memmove(Handler->hmcHandler.OffsetScale.compass_cal_values,
+            compass_cal_values, 6 * sizeof(int16_t));
+    printf("MinX=%d,MaxX=%d\r\nMinY=%d,MaxY=%d\r\nMinZ=%d,MaxZ=%d\r\n",
+           compass_cal_values[0], compass_cal_values[1], compass_cal_values[2],
+           compass_cal_values[3], compass_cal_values[4], compass_cal_values[5]);
+    // Calculates the calibration and offset values
+    Sensor_compass_calculate_offset(&Handler->hmcHandler.OffsetScale);
+    // Put the function to store the calibration values to the Flash
+}
+
+void Sensor_compass_calculate_offset(HMC5883L_Offset_Scale_t *OffsetScale) {
+    int16_t compass_cal_values[6];
+    memmove(compass_cal_values, OffsetScale->compass_cal_values,
+            6 * sizeof(int16_t));
+    OffsetScale->scale_y =
+        ((float)compass_cal_values[1] - compass_cal_values[0]) /
+        (compass_cal_values[3] - compass_cal_values[2]);
+    OffsetScale->scale_z =
+        ((float)compass_cal_values[1] - compass_cal_values[0]) /
+        (compass_cal_values[5] - compass_cal_values[4]);
+
+    OffsetScale->offset_x =
+        (compass_cal_values[1] - compass_cal_values[0]) / 2 -
+        compass_cal_values[1];
+    OffsetScale->offset_y =
+        (((float)compass_cal_values[3] - compass_cal_values[2]) / 2 -
+         compass_cal_values[3]) *
+        OffsetScale->scale_y;
+    OffsetScale->offset_z =
+        (((float)compass_cal_values[5] - compass_cal_values[4]) / 2 -
+         compass_cal_values[5]) *
+        OffsetScale->scale_z;
+}
+
+// The following subrouting calculates the smallest difference between two
+// heading values.
+float course_deviation(float course_b, float course_c) {
+    float course_a;
+    float base_course_mirrored;
+    float actual_course_mirrored;
+    course_a = course_b - course_c;
+    if (course_a < -180 || course_a > 180) {
+        if (course_c > 180)
+            base_course_mirrored = course_c - 180;
+        else
+            base_course_mirrored = course_c + 180;
+        if (course_b > 180)
+            actual_course_mirrored = course_b - 180;
+        else
+            actual_course_mirrored = course_b + 180;
+        course_a = actual_course_mirrored - base_course_mirrored;
+    }
+    return course_a;
 }

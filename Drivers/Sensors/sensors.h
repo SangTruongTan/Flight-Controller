@@ -19,6 +19,8 @@ by this software, read more about this on the GNU General Public License.
 #define _SENSORS_H__
 
 /* Private includes ----------------------------------------------------------*/
+#include <stdio.h>
+
 #include "HMC5883.h"
 #include "MS5611.h"
 #include "ST_MPU6050.h"
@@ -43,6 +45,14 @@ typedef struct SensorParameters_t {
     GpsData_t Gps;
 } SensorParameters_t;
 
+typedef struct Sensor_Calibration_t {
+    void (*wait)(uint32_t);
+    uint32_t (*GetTime)(void);
+    void (*waitUntil)(uint32_t *, uint32_t);
+    uint32_t StartTask;
+    uint16_t *ThrustChannel;
+} Sensor_Calibration_t;
+
 typedef struct Sensor_handle_t {
     MPU6050_handle_t mpuHandler;
     HMC5883L_Handle_t hmcHandler;
@@ -53,6 +63,7 @@ typedef struct Sensor_handle_t {
     I2C_HandleTypeDef *mpuhi2c;
     I2C_HandleTypeDef *hmchi2c;
     RingHandler_t *gpsRing;
+    Sensor_Calibration_t Calibration;
     bool enableHMC;
     bool enableMPU;
     bool enableMS;
@@ -89,4 +100,7 @@ Sensor_status_t sensors_update(Sensor_handle_t *Handle);
 Sensor_status_t Sensor_Gps_Update(Sensor_handle_t *Handler);
 
 void Sensor_Gyro_Calibration(Sensor_handle_t *Handler);
+void Sensor_Compass_Calibration(Sensor_handle_t *Handler);
+float course_deviation(float course_b, float course_c);
+
 #endif /* End of File */

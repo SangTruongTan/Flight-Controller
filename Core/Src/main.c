@@ -44,6 +44,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define dt 0.004f
+#define TUNE_PID 0
 
 /* USER CODE END PD */
 
@@ -76,6 +77,7 @@ TaskHandle_t LoopTask;
 TaskHandle_t GpsTask;
 TaskHandle_t ControlTask;
 TaskHandle_t FeedbackTask;
+TaskHandle_t CalibrationTask;
 
 RingBuffer_t Ring;
 Sensor_handle_t sensors;
@@ -106,6 +108,7 @@ void Loop_task(void *pvParameters);
 void GPS_task(void *pvParameters);
 void Control_task(void *pvParameters);
 void Feedback_task(void *pvParameters);
+void Calibration_task(void *pvParameters);
 
 /* USER CODE END PFP */
 
@@ -186,6 +189,28 @@ int main(void) {
     sensors.mshi2c = &hi2c1;
     sensors.gpsRing = &Ring.Ring3;
     sensors.msHandler.wait = vTaskDelay;
+    // Init compass calibration
+    // sensors.hmcHandler.OffsetScale.offset_x = -128;
+    // sensors.hmcHandler.OffsetScale.offset_y = -160;
+    // sensors.hmcHandler.OffsetScale.offset_z = 117;
+    // sensors.hmcHandler.OffsetScale.scale_y = 1.051408;
+    // sensors.hmcHandler.OffsetScale.scale_z = 1.149933;
+    sensors.hmcHandler.OffsetScale.compass_cal_values[0] = -302;
+    sensors.hmcHandler.OffsetScale.compass_cal_values[1] = 557;
+    sensors.hmcHandler.OffsetScale.compass_cal_values[2] = -256;
+    sensors.hmcHandler.OffsetScale.compass_cal_values[3] = 561;
+    sensors.hmcHandler.OffsetScale.compass_cal_values[4] = -476;
+    sensors.hmcHandler.OffsetScale.compass_cal_values[5] = 271;
+    sensors.hmcHandler.OffsetScale.declination = 0;
+    // Calibration value for gyroscope
+    sensors.mpuHandler.GyroOffset.x = 114;
+    sensors.mpuHandler.GyroOffset.y = 10;
+    sensors.mpuHandler.GyroOffset.z = -45;
+    // Init for calibration Task
+    sensors.Calibration.GetTime = &xTaskGetTickCount;
+    sensors.Calibration.wait = &vTaskDelay;
+    sensors.Calibration.waitUntil = &vTaskDelayUntil;
+    sensors.Calibration.ThrustChannel = &Control.Control.JoyStick.Thrust;
     // Init for ADC Battery Voltage reading
     sensors.AdcBat = &AdcBatValue;
 // Init for Remote Control
@@ -200,15 +225,18 @@ int main(void) {
     ControlInit.Joystick.Roll = 1500;
     ControlInit.Joystick.Yaw = 1500;
     ControlInit.Joystick.Thrust = 1000;
+#if TUNE_PID == 0
     ControlInit.ControlPid.Pitch.P = 1.3;
-    ControlInit.ControlPid.Pitch.I = 0.04;
-    ControlInit.ControlPid.Pitch.D = 18.0;
+    ControlInit.ControlPid.Pitch.I = 0.008;
+    ControlInit.ControlPid.Pitch.D = 20.0;
     ControlInit.ControlPid.Roll.P = 1.3;
-    ControlInit.ControlPid.Roll.I = 0.04;
-    ControlInit.ControlPid.Roll.D = 18.0;
+    ControlInit.ControlPid.Roll.I = 0.008;
+    ControlInit.ControlPid.Roll.D = 20.0;
     ControlInit.ControlPid.Yaw.P = 4;
     ControlInit.ControlPid.Yaw.I = 0.02;
     ControlInit.ControlPid.Yaw.D = 0.0;
+#else
+#endif
     ControlInit.ControlPid.Pitch.MaxPID = 400;
     ControlInit.ControlPid.Roll.MaxPID = 400;
     ControlInit.ControlPid.Yaw.MaxPID = 400;
@@ -233,13 +261,6 @@ int main(void) {
             ;
     }
     HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, 1);
-    if (HAL_GPIO_ReadPin(BTN1_GPIO_Port, BTN1_Pin) == 0) {
-        Sensor_Gyro_Calibration(&sensors);
-    } else {
-        sensors.mpuHandler.GyroOffset.x = 114;
-        sensors.mpuHandler.GyroOffset.y = 10;
-        sensors.mpuHandler.GyroOffset.z = -45;
-    }
     xTaskCreate(&Default_task, "Default", 512, NULL, 1, &DefaultTask);
     // Start Scheduler
     vTaskStartScheduler();
@@ -618,6 +639,7 @@ int _write(int file, char *outgoing, int len) {
 }
 
 void Default_task(void *pvParameters) {
+    printf("*** Welcome to Flight Controller Software ***\r\n");
     // xTaskCreate(&GPS_task, "Gps", 512, NULL, 2, &GpsTask);
     xTaskCreate(&Loop_task, "Loop", 256, NULL, 3, &LoopTask);
     xTaskCreate(&Control_task, "Control", 256, NULL, 2, &ControlTask);
@@ -637,11 +659,27 @@ void Loop_task(void *pvParameters) {
         if (sensors.status != SENSOR_OK) {
             printf("The Sensors error:%d\r\n", sensors.status);
         } else {
-            if (count > 10) {
-                // printf("Adc:%d, V= %f\r\n", AdcBatValue, sensors.Angle.VBat);
+            if (count > 20) {
+                // printf("Heading=%f\r\n",
+                //        sensors.hmcHandler.CompassData.actual_heading);
+                printf("y=%f,x=%f,head=%f\r\n", sensors.hmcHandler.CompassData.y_horizontal,
+                                        sensors.hmcHandler.CompassData.x_horizontal,
+                                        sensors.Angle.Yaw);
                 count = 0;
                 HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
             } else {
+            }
+        }
+        // Detect calibration
+        if (Control.Control.JoyStick.Thrust < 1020) {
+            if (Control.Control.JoyStick.Yaw > 1900 &&
+                Control.Control.JoyStick.Roll < 1080 &&
+                Control.Control.JoyStick.Pitch < 1080) {
+                xTaskCreate(&Calibration_task, "Calibration", 256, NULL, 3,
+                            &CalibrationTask);
+                vTaskSuspend(NULL);
+                // Wait Until the calibration task resume this task again
+                StartTask = xTaskGetTickCount();
             }
         }
         vTaskDelayUntil(&StartTask, 4);
@@ -685,8 +723,6 @@ void Control_task(void *pvParameters) {
             if (count > 10) {
                 count = 0;
                 HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
-                printf("%d,%d,%d,%d\r\n", PID.Motors.Esc_1, PID.Motors.Esc_2,
-                       PID.Motors.Esc_3, PID.Motors.Esc_4);
             }
             LostMonitoring = 0;
         }
@@ -714,6 +750,62 @@ void Feedback_task(void *pvParameters) {
             AckId = 0;
         }
         vTaskDelayUntil(&StartTask, 200);
+    }
+}
+
+void Calibration_task(void *pvParameters) {
+    HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin | LED3_Pin | LED4_Pin,
+                      GPIO_PIN_SET);
+    for (int i = 0; i < 10; i++) {
+        HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+        vTaskDelay(500);
+    }
+    for (;;) {
+        if (Control.Control.JoyStick.Thrust > 1800 &&
+            Control.Control.JoyStick.Yaw < 1060) {  // Yaw right
+            sensors.Calibration.StartTask = xTaskGetTickCount();
+            HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin | LED3_Pin,
+                              GPIO_PIN_SET);
+            Sensor_Gyro_Calibration(&sensors);
+            HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin | LED3_Pin,
+                              GPIO_PIN_SET);
+            while (Control.Control.JoyStick.Thrust >= 1030) {
+                HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
+                vTaskDelay(500);
+                HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
+                vTaskDelay(200);
+            }
+        }
+        if (Control.Control.JoyStick.Thrust > 1800 &&
+            Control.Control.JoyStick.Yaw > 1900) {  // Yaw left
+            sensors.Calibration.StartTask = xTaskGetTickCount();
+            HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin | LED3_Pin,
+                              GPIO_PIN_SET);
+            Sensor_Compass_Calibration(&sensors);
+            HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin | LED3_Pin | LED4_Pin,
+                              GPIO_PIN_SET);
+            printf("Compass:sy=%f,sz=%f,ox=%d,oy=%d,oz=%d\r\n",
+                   sensors.hmcHandler.OffsetScale.scale_y,
+                   sensors.hmcHandler.OffsetScale.scale_z,
+                   sensors.hmcHandler.OffsetScale.offset_x,
+                   sensors.hmcHandler.OffsetScale.offset_y,
+                   sensors.hmcHandler.OffsetScale.offset_z);
+            while (Control.Control.JoyStick.Thrust >= 1030) {
+                HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
+                vTaskDelay(1000);
+                HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
+                vTaskDelay(500);
+            }
+        }
+        if (Control.Control.JoyStick.Thrust < 1030 &&
+            Control.Control.JoyStick.Yaw > 1900) {  // Yaw left
+            HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin | LED3_Pin,
+                              GPIO_PIN_SET);
+            vTaskResume(LoopTask);
+            vTaskDelete(CalibrationTask);
+        }
+        HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin | LED3_Pin);
+        vTaskDelay(200);
     }
 }
 

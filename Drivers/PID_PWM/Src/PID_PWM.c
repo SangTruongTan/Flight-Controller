@@ -25,7 +25,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-
+#define PHI_DIV_180 0.0174533
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
@@ -58,6 +58,22 @@ void PIDPWM_Process() {
     }
 
     // Put heading lock here
+    if (Handle->Control->HeadingLock == true) {
+        Handle->Heading.HeadingLockDeviation = course_deviation(
+            Handle->Angle->GyroAxis.yaw, Handle->Heading.LockHeading);
+        Handle->SetPointBase.Roll =
+            1500 +
+            ((float)(Handle->Control->JoyStick.Roll - 1500) *
+             cos(Handle->Heading.HeadingLockDeviation * PHI_DIV_180)) +
+            ((float)(Handle->Control->JoyStick.Pitch - 1500) *
+             cos((Handle->Heading.HeadingLockDeviation - 90) * PHI_DIV_180));
+        Handle->SetPointBase.Pitch =
+            1500 +
+            ((float)(Handle->Control->JoyStick.Pitch - 1500) *
+             cos(Handle->Heading.HeadingLockDeviation * PHI_DIV_180)) +
+            ((float)(Handle->Control->JoyStick.Roll - 1500) *
+             cos((Handle->Heading.HeadingLockDeviation + 90) * PHI_DIV_180));
+    }
     // Put the GPS control here
     // Limit the range
     if (Handle->SetPointBase.Pitch > 2000)

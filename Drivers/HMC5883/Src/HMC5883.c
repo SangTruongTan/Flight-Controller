@@ -145,9 +145,11 @@ HMC5883L_Status_t HMC5883L_Get_Raw(HMC5883L_Handle_t *Handle) {
     status = HMC5883L_Read(Handle, HMC5883L_RA_DATAX_H, dataR, 6);
     Handle->Status = status;
     if (status == HMC5883L_OK) {
-        Handle->Raw.x = dataR[0] << 8 | dataR[1];
+        Handle->Raw.y = dataR[0] << 8 | dataR[1];
+        Handle->Raw.y *= -1;
         Handle->Raw.z = dataR[2] << 8 | dataR[3];
-        Handle->Raw.y = dataR[4] << 8 | dataR[5];
+        Handle->Raw.x = dataR[4] << 8 | dataR[5];
+        Handle->Raw.x *= -1;
         Handle->State = HMC5883L_OK_STATE;
     } else {
         Handle->State = HMC5883L_ERROR_STATE;
@@ -216,4 +218,16 @@ HMC5883L_State_t HMC5883L_Init(HMC5883L_Handle_t *Handle,
     // Return value
     Handle->State = HMC5883L_OK_STATE;
     return HMC5883L_OK_STATE;
+}
+
+HMC5883L_Status_t HMC5883L_Update(HMC5883L_Handle_t *Handle) {
+    if(HMC5883L_Get_Raw(Handle) != HMC5883L_OK)
+        return HMC5883L_ERROR;
+    //Calirate the compass value
+    Handle->Raw.x += Handle->OffsetScale.offset_x;
+    Handle->Raw.y += Handle->OffsetScale.offset_y;
+    Handle->Raw.y *= Handle->OffsetScale.scale_y;
+    Handle->Raw.z += Handle->OffsetScale.offset_z;
+    Handle->Raw.z *= Handle->OffsetScale.scale_z;
+    return HMC5883L_OK;
 }

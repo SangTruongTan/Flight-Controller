@@ -61,6 +61,11 @@ typedef struct PWMMOTOR_t {
     int16_t Esc_4;
 } PWMMOTOR_t;
 
+typedef struct Heading_t {
+    float HeadingLockDeviation;
+    float LockHeading;
+} Heading_t;
+
 typedef struct PIDPWMHandle_t {
     TIM_HandleTypeDef *htim;
     ControlInfo_t *Control;
@@ -71,6 +76,7 @@ typedef struct PIDPWMHandle_t {
     PIDOutput_t PIDPitch;
     PIDOutput_t PIDYaw;
     PWMMOTOR_t Motors;
+    Heading_t Heading;
     ControlMode_t *Mode;
 } PIDPWMHandle_t;
 
