@@ -227,11 +227,11 @@ int main(void) {
     ControlInit.Joystick.Thrust = 1000;
 #if TUNE_PID == 0
     ControlInit.ControlPid.Pitch.P = 1.3;
-    ControlInit.ControlPid.Pitch.I = 0.008;
-    ControlInit.ControlPid.Pitch.D = 20.0;
+    ControlInit.ControlPid.Pitch.I = 0.04;
+    ControlInit.ControlPid.Pitch.D = 18.0;
     ControlInit.ControlPid.Roll.P = 1.3;
-    ControlInit.ControlPid.Roll.I = 0.008;
-    ControlInit.ControlPid.Roll.D = 20.0;
+    ControlInit.ControlPid.Roll.I = 0.04;
+    ControlInit.ControlPid.Roll.D = 18.0;
     ControlInit.ControlPid.Yaw.P = 4;
     ControlInit.ControlPid.Yaw.I = 0.02;
     ControlInit.ControlPid.Yaw.D = 0.0;
@@ -673,8 +673,8 @@ void Loop_task(void *pvParameters) {
         // Detect calibration
         if (Control.Control.JoyStick.Thrust < 1020) {
             if (Control.Control.JoyStick.Yaw > 1900 &&
-                Control.Control.JoyStick.Roll < 1080 &&
-                Control.Control.JoyStick.Pitch < 1080) {
+                Control.Control.JoyStick.Roll > 1800 &&
+                Control.Control.JoyStick.Pitch > 1800) {
                 xTaskCreate(&Calibration_task, "Calibration", 256, NULL, 3,
                             &CalibrationTask);
                 vTaskSuspend(NULL);
