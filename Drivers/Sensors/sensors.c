@@ -220,6 +220,10 @@ void Sensor_Gyro_Calibration(Sensor_handle_t *Handler) {
     int32_t x = 0;
     int32_t y = 0;
     int32_t z = 0;
+    Handler->mpuHandler.GyroOffset.x = 0;
+    Handler->mpuHandler.GyroOffset.y = 0;
+    Handler->mpuHandler.GyroOffset.z = 0;
+
     for (int i = 0; i < 2000; i++) {
         MPU6050_GyroRead_Raw(&Handler->mpuHandler);
         x += Handler->mpuHandler.GyroRaw.x;
