@@ -100,6 +100,7 @@ Sensor_status_t sensors_update(Sensor_handle_t *Handle);
 Sensor_status_t Sensor_Gps_Update(Sensor_handle_t *Handler);
 
 void Sensor_Gyro_Calibration(Sensor_handle_t *Handler);
+void Sensor_Acce_Calibration(Sensor_handle_t *Handler);
 void Sensor_Compass_Calibration(Sensor_handle_t *Handler);
 float course_deviation(float course_b, float course_c);
 

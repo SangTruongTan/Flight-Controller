@@ -203,9 +203,13 @@ int main(void) {
     sensors.hmcHandler.OffsetScale.compass_cal_values[5] = 271;
     sensors.hmcHandler.OffsetScale.declination = 0;
     // Calibration value for gyroscope
-    sensors.mpuHandler.GyroOffset.x = 114;
-    sensors.mpuHandler.GyroOffset.y = 10;
-    sensors.mpuHandler.GyroOffset.z = -45;
+    sensors.mpuHandler.GyroOffset.x = 115;
+    sensors.mpuHandler.GyroOffset.y = 8;
+    sensors.mpuHandler.GyroOffset.z = -44;
+    //Calibration value for Accelerometer
+    sensors.mpuHandler.AccOffset.x = 35;
+    sensors.mpuHandler.AccOffset.y = -66;
+    sensors.mpuHandler.AccOffset.z = 0;
     // Init for calibration Task
     sensors.Calibration.GetTime = &xTaskGetTickCount;
     sensors.Calibration.wait = &vTaskDelay;
@@ -660,11 +664,6 @@ void Loop_task(void *pvParameters) {
             printf("The Sensors error:%d\r\n", sensors.status);
         } else {
             if (count > 20) {
-                // printf("Heading=%f\r\n",
-                //        sensors.hmcHandler.CompassData.actual_heading);
-                printf("y=%f,x=%f,head=%f\r\n", sensors.hmcHandler.CompassData.y_horizontal,
-                                        sensors.hmcHandler.CompassData.x_horizontal,
-                                        sensors.Angle.Yaw);
                 count = 0;
                 HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
             } else {
@@ -756,19 +755,25 @@ void Feedback_task(void *pvParameters) {
 void Calibration_task(void *pvParameters) {
     HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin | LED3_Pin | LED4_Pin,
                       GPIO_PIN_SET);
+    printf("** In the calibration mode **\r\n");
     for (int i = 0; i < 10; i++) {
         HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
-        vTaskDelay(500);
+        vTaskDelay(200);
     }
     for (;;) {
+        // Gyro Calibration - Yaw right
         if (Control.Control.JoyStick.Thrust > 1800 &&
             Control.Control.JoyStick.Yaw < 1060) {  // Yaw right
             sensors.Calibration.StartTask = xTaskGetTickCount();
             HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin | LED3_Pin,
                               GPIO_PIN_SET);
             Sensor_Gyro_Calibration(&sensors);
-            HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin | LED3_Pin,
-                              GPIO_PIN_SET);
+            printf("* Gyro offset:x=%d,y=%d,z=%d\r\n",
+                   sensors.mpuHandler.GyroOffset.x,
+                   sensors.mpuHandler.GyroOffset.y,
+                   sensors.mpuHandler.GyroOffset.z);
+                HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin | LED3_Pin,
+                                  GPIO_PIN_SET);
             while (Control.Control.JoyStick.Thrust >= 1030) {
                 HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
                 vTaskDelay(500);
@@ -776,6 +781,26 @@ void Calibration_task(void *pvParameters) {
                 vTaskDelay(200);
             }
         }
+        // Accelerometer Calibration - Roll right
+        if (Control.Control.JoyStick.Thrust > 1800 &&
+            Control.Control.JoyStick.Roll > 1900) {  // Roll right
+            sensors.Calibration.StartTask = xTaskGetTickCount();
+            HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin | LED3_Pin,
+                              GPIO_PIN_SET);
+            Sensor_Acce_Calibration(&sensors);
+            HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin | LED3_Pin | LED4_Pin,
+                              GPIO_PIN_SET);
+            printf("* Accelerometer offset:x=%d,y=%d\r\n",
+                   sensors.mpuHandler.AccOffset.x,
+                   sensors.mpuHandler.AccOffset.y);
+            while (Control.Control.JoyStick.Thrust >= 1030) {
+                HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
+                vTaskDelay(1000);
+                HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
+                vTaskDelay(500);
+            }
+        }
+        // Compass Calibration - Yaw left
         if (Control.Control.JoyStick.Thrust > 1800 &&
             Control.Control.JoyStick.Yaw > 1900) {  // Yaw left
             sensors.Calibration.StartTask = xTaskGetTickCount();
@@ -784,7 +809,7 @@ void Calibration_task(void *pvParameters) {
             Sensor_Compass_Calibration(&sensors);
             HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin | LED3_Pin | LED4_Pin,
                               GPIO_PIN_SET);
-            printf("Compass:sy=%f,sz=%f,ox=%d,oy=%d,oz=%d\r\n",
+            printf("* Compass:sy=%f,sz=%f,ox=%d,oy=%d,oz=%d\r\n",
                    sensors.hmcHandler.OffsetScale.scale_y,
                    sensors.hmcHandler.OffsetScale.scale_z,
                    sensors.hmcHandler.OffsetScale.offset_x,

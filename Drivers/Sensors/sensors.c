@@ -238,6 +238,24 @@ void Sensor_Gyro_Calibration(Sensor_handle_t *Handler) {
     // Put the calibration value to the Flash here
 }
 
+void Sensor_Acce_Calibration(Sensor_handle_t *Handler) {
+    MPU6050_AcceDataRaw *Acc = &Handler->mpuHandler.AccRaw;
+    Handler->mpuHandler.AccOffset.x = 0;
+    Handler->mpuHandler.AccOffset.y = 0;
+    int32_t acc_cal_roll = 0;
+    int32_t acc_cal_pitch = 0;
+    for(int i = 0; i < 500; i++) {
+        MPU6050_read_mpu_data(&Handler->mpuHandler);
+        acc_cal_roll += Acc->x;
+        acc_cal_pitch += Acc->y;
+        if (i % 15 == 0) HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
+        Handler->Calibration.waitUntil(&Handler->Calibration.StartTask, 4);
+    }
+    Handler->mpuHandler.AccOffset.x = acc_cal_roll / 500;
+    Handler->mpuHandler.AccOffset.y = acc_cal_pitch / 500;
+    // Put the calibration value to the Flash here
+}
+
 void Sensor_Compass_Calibration(Sensor_handle_t *Handler) {
     int16_t compass_cal_values[6];
     uint32_t i = 0;
