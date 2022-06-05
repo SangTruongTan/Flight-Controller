@@ -30,7 +30,7 @@
 /* Private define ------------------------------------------------------------*/
 #define CONTROL_ROWS 12
 #define CONTROL_COLUMNS 16
-
+#define CONTROL_CMD_MAX_LENGTH 64
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
@@ -84,17 +84,24 @@ ControlStatus_t Decode_CMD(ControlInfo_t *Control,
         return CONTROL_ERROR;
     while (StructBuffer[index][0] != '\0') {
         if (strcmp((const char *)&StructBuffer[index], "T") == 0) {
-            Control->JoyStick.Thrust =
-                atoi((const char *)&StructBuffer[index + 1]);
+            int Thrust = atoi((const char *)&StructBuffer[index + 1]);
+            if (Thrust >= 1000 && Thrust <= 2000)
+                Control->JoyStick.Thrust = Thrust;
         } else if (strcmp((const char *)&StructBuffer[index], "R") == 0) {
-            Control->JoyStick.Roll =
-                atoi((const char *)&StructBuffer[index + 1]);
+            int Roll = atoi((const char *)&StructBuffer[index + 1]);
+            if (Roll >= 1000 && Roll <= 2000) Control->JoyStick.Roll = Roll;
         } else if (strcmp((const char *)&StructBuffer[index], "P") == 0) {
-            Control->JoyStick.Pitch =
-                atoi((const char *)&StructBuffer[index + 1]);
+            int Pitch = atoi((const char *)&StructBuffer[index + 1]);
+            if (Pitch >= 1000 && Pitch <= 2000) Control->JoyStick.Pitch = Pitch;
         } else if (strcmp((const char *)&StructBuffer[index], "Y") == 0) {
-            Control->JoyStick.Yaw =
-                atoi((const char *)&StructBuffer[index + 1]);
+            int Yaw = atoi((const char *)&StructBuffer[index + 1]);
+            if (Yaw >= 1000 && Yaw <= 2000) Control->JoyStick.Yaw = Yaw;
+        } else if (strcmp((const char *)&StructBuffer[index], "H") == 0) {
+            if (StructBuffer[index + 1][0] == 'T') {
+                Control->HeadingLock = true;
+            } else {
+                Control->HeadingLock = false;
+            }
         }
         index += 2;
     }
@@ -228,8 +235,8 @@ void Control_Init(ControlHandler_t *Handler, ControlInit_t Init) {
  * @retval ControlStatus_t
  */
 ControlStatus_t Control_Process(void) {
-    uint8_t *Buffer;
-    uint8_t *Buffer1;
+    uint8_t *Buffer = NULL;
+    uint8_t *Buffer1 = NULL;
     uint8_t StructBuffer[CONTROL_ROWS][CONTROL_COLUMNS];
     ControlStatus_t Status = CONTROL_ERROR;
     if (Detect_Char(ControlHandler->Serial, '\n')) {
@@ -237,8 +244,10 @@ ControlStatus_t Control_Process(void) {
         Buffer1 = malloc(128);
         memset(Buffer1, '\0', 128);
         memset(Buffer, '\0', 128);
-        while (Get_String_NonBlocking(ControlHandler->Serial, Buffer, '\n') >
-               0) {
+        int Length =
+            Get_String_NonBlocking(ControlHandler->Serial, Buffer, '\n');
+        if (Length > 0 && Length < CONTROL_CMD_MAX_LENGTH) {
+            memmove(Buffer1, Buffer, Length);
             strcpy((char *)Buffer1, (char *)Buffer);
             Control_Parse(StructBuffer, Buffer, ',');
             if (strcmp((const char *)&StructBuffer[0], "CMD") == 0) {
@@ -259,7 +268,6 @@ ControlStatus_t Control_Process(void) {
             ControlHandler->Status = Status;
         }
         // Put the string want to forward
-
         free(Buffer);
         free(Buffer1);
     }

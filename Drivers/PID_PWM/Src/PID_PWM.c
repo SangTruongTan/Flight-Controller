@@ -50,8 +50,8 @@ void PIDPWM_Init(PIDPWMHandle_t *HandleInit) {
 void PIDPWM_Process() {
     // Check LOST connection Mode
     if (*Handle->Mode == LOST_MODE) {
-        Handle->SetPointBase.Pitch = 0;
-        Handle->SetPointBase.Roll = 0;
+        Handle->SetPointBase.Pitch = 1500;
+        Handle->SetPointBase.Roll = 1500;
     } else {
         Handle->SetPointBase.Pitch = Handle->Control->JoyStick.Pitch;
         Handle->SetPointBase.Roll = Handle->Control->JoyStick.Roll;
@@ -129,10 +129,24 @@ void PIDPWM_Process() {
     // Yaw PID's calculation.
     PID_Calculate(&Handle->PIDYaw);
     // Check for I controller when the Drone isn't start yet.
-    if (Handle->Motors.Throttle < 1010) {
+    if (Handle->Control->JoyStick.Thrust < 1050) {
+        //Initialize the angles
+        Handle->Angle->GyroAxis.pitch = Handle->Angle->AcceAxis.pitch;
+        Handle->Angle->GyroAxis.roll = Handle->Angle->AcceAxis.roll;
+        //Take heading data
+        Handle->Heading.LockHeading = Handle->Angle->GyroAxis.yaw;
+        //For Roll
         Handle->PIDRoll.IMem = 0;
+        Handle->PIDRoll.LastError = 0;
+        Handle->PIDRoll.Output = 0;
+        //For Pitch
         Handle->PIDPitch.IMem = 0;
+        Handle->PIDPitch.LastError = 0;
+        Handle->PIDPitch.Output = 0;
+        //For Yaw
         Handle->PIDYaw.IMem = 0;
+        Handle->PIDYaw.LastError = 0;
+        Handle->PIDYaw.Output = 0;
     }
     // Process for PWM
     // Detect the Drone Crash
@@ -142,15 +156,18 @@ void PIDPWM_Process() {
         *Handle->Mode = BLOCK_MODE;
     // Put the Throttle calculation here
     // Check LOST connection Mode
-    if (*Handle->Mode == LOST_MODE) {
+    if (*Handle->Mode == LOST_MODE)
         Handle->Motors.Throttle = 1080;
+    else {
+        if(Handle->Control->JoyStick.Thrust < 1050) {
+            Handle->Motors.Throttle = MOTOR_IDLE_SPEED;
+        } else {
+            Handle->Motors.Throttle = Handle->Control->JoyStick.Thrust;
+        }
     }
 
-    else
-        Handle->Motors.Throttle = Handle->Control->JoyStick.Thrust;
 
-    if (*Handle->Mode != BLOCK_MODE &&
-        Handle->Control->JoyStick.Thrust > 1010) {
+    if (*Handle->Mode == MANUAL_MODE || *Handle->Mode == LOST_MODE) {
         if (Handle->Motors.Throttle > 1800) Handle->Motors.Throttle = 1800;
         Handle->Motors.Esc_1 = Handle->Motors.Throttle -
                                Handle->PIDPitch.Output +
@@ -164,31 +181,25 @@ void PIDPWM_Process() {
         Handle->Motors.Esc_4 = Handle->Motors.Throttle -
                                Handle->PIDPitch.Output -
                                Handle->PIDRoll.Output + Handle->PIDYaw.Output;
-        if (Handle->Motors.Esc_1 < 1000) {
-            Handle->Motors.Esc_1 = 1000;
+        if (Handle->Motors.Esc_1 < MOTOR_IDLE_SPEED) {
+            Handle->Motors.Esc_1 = MOTOR_IDLE_SPEED;
         } else if (Handle->Motors.Esc_1 > 2000) {
             Handle->Motors.Esc_1 = 2000;
         }
-        if (Handle->Motors.Esc_2 < 1000) {
-            Handle->Motors.Esc_2 = 1000;
+        if (Handle->Motors.Esc_2 < MOTOR_IDLE_SPEED) {
+            Handle->Motors.Esc_2 = MOTOR_IDLE_SPEED;
         } else if (Handle->Motors.Esc_2 > 2000) {
             Handle->Motors.Esc_2 = 2000;
         }
-        if (Handle->Motors.Esc_3 < 1000) {
-            Handle->Motors.Esc_3 = 1000;
+        if (Handle->Motors.Esc_3 < MOTOR_IDLE_SPEED) {
+            Handle->Motors.Esc_3 = MOTOR_IDLE_SPEED;
         } else if (Handle->Motors.Esc_3 > 2000) {
             Handle->Motors.Esc_3 = 2000;
         }
-        if (Handle->Motors.Esc_4 < 1000) {
-            Handle->Motors.Esc_4 = 1000;
+        if (Handle->Motors.Esc_4 < MOTOR_IDLE_SPEED) {
+            Handle->Motors.Esc_4 = MOTOR_IDLE_SPEED;
         } else if (Handle->Motors.Esc_4 > 2000) {
             Handle->Motors.Esc_4 = 2000;
-        }
-        if (Handle->Control->JoyStick.Thrust > 1010) {
-            if (Handle->Motors.Esc_1 < 1100) Handle->Motors.Esc_1 = 1100;
-            if (Handle->Motors.Esc_2 < 1100) Handle->Motors.Esc_2 = 1100;
-            if (Handle->Motors.Esc_3 < 1100) Handle->Motors.Esc_3 = 1100;
-            if (Handle->Motors.Esc_4 < 1100) Handle->Motors.Esc_4 = 1100;
         }
     } else {
         Handle->Motors.Esc_1 = 1000;
@@ -208,12 +219,40 @@ void PIDPWM_Process() {
     } else if (Handle->Control->JoyStick.Thrust < 1030) {
         Handle->Control->JoyStick.Thrust = 1000;
     }
+    #if BALANCE_PROPELS & 0x01
+    Handle->htim->Instance->CCR1 = Handle->Control->JoyStick.Thrust;
+    Handle->htim->Instance->CCR2 = 1000;
+    Handle->htim->Instance->CCR3 = 1000;
+    Handle->htim->Instance->CCR4 = 1000;
+    #elif BALANCE_PROPELS & 0x02
+    Handle->htim->Instance->CCR2 = Handle->Control->JoyStick.Thrust;
+    Handle->htim->Instance->CCR1 = 1000;
+    Handle->htim->Instance->CCR3 = 1000;
+    Handle->htim->Instance->CCR4 = 1000;
+    #elif BALANCE_PROPELS & 0x04
+    Handle->htim->Instance->CCR3 = Handle->Control->JoyStick.Thrust;
+    Handle->htim->Instance->CCR1 = 1000;
+    Handle->htim->Instance->CCR2 = 1000;
+    Handle->htim->Instance->CCR4 = 1000;
+    #elif BALANCE_PROPELS & 0x08
+    Handle->htim->Instance->CCR4 = Handle->Control->JoyStick.Thrust;
+    Handle->htim->Instance->CCR1 = 1000;
+    Handle->htim->Instance->CCR2 = 1000;
+    Handle->htim->Instance->CCR3 = 1000;
+    #else
     Handle->htim->Instance->CCR1 = Handle->Control->JoyStick.Thrust;
     Handle->htim->Instance->CCR2 = Handle->Control->JoyStick.Thrust;
     Handle->htim->Instance->CCR3 = Handle->Control->JoyStick.Thrust;
     Handle->htim->Instance->CCR4 = Handle->Control->JoyStick.Thrust;
+    #endif
 #endif
-    // Handle->htim->Instance->CNT = 5000;
+#if NO_MOTOR == 1
+    Handle->htim->Instance->CCR1 = 1000;
+    Handle->htim->Instance->CCR2 = 1000;
+    Handle->htim->Instance->CCR3 = 1000;
+    Handle->htim->Instance->CCR4 = 1000;
+#endif
+    Handle->htim->Instance->CNT = 5000;
 }
 
 void PID_Calculate(PIDOutput_t *PID) {

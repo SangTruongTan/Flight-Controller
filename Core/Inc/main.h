@@ -107,7 +107,10 @@ void Error_Handler(void);
 #define MEMS_SDA_Pin GPIO_PIN_7
 #define MEMS_SDA_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
+#define NO_MOTOR 0
 #define MOTOR_CONFIG 0
+#define BALANCE_PROPELS 0x0
+#define MOTOR_IDLE_SPEED 1100
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

@@ -110,6 +110,8 @@ void Control_task(void *pvParameters);
 void Feedback_task(void *pvParameters);
 void Calibration_task(void *pvParameters);
 
+/// Support function
+void check_motor_vibrations(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -160,17 +162,10 @@ int main(void) {
     HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_2);
     HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_3);
     HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_4);
-#if MOTOR_CONFIG == 0
     htim5.Instance->CCR1 = 1000;
     htim5.Instance->CCR2 = 1000;
     htim5.Instance->CCR3 = 1000;
     htim5.Instance->CCR4 = 1000;
-#else
-    htim5.Instance->CCR1 = 2000;
-    htim5.Instance->CCR2 = 2000;
-    htim5.Instance->CCR3 = 2000;
-    htim5.Instance->CCR4 = 2000;
-#endif
     HAL_Delay(200);
     // Init for Ring Buffer. Must be called first
     Ring.Ring1.enable = true;
@@ -203,12 +198,12 @@ int main(void) {
     sensors.hmcHandler.OffsetScale.compass_cal_values[5] = 271;
     sensors.hmcHandler.OffsetScale.declination = 0;
     // Calibration value for gyroscope
-    sensors.mpuHandler.GyroOffset.x = 115;
-    sensors.mpuHandler.GyroOffset.y = 8;
-    sensors.mpuHandler.GyroOffset.z = -44;
-    //Calibration value for Accelerometer
-    sensors.mpuHandler.AccOffset.x = 35;
-    sensors.mpuHandler.AccOffset.y = -66;
+    sensors.mpuHandler.GyroOffset.x = 125;
+    sensors.mpuHandler.GyroOffset.y = 6;
+    sensors.mpuHandler.GyroOffset.z = -46;
+    // Calibration value for Accelerometer
+    sensors.mpuHandler.AccOffset.x = 114;
+    sensors.mpuHandler.AccOffset.y = -46;
     sensors.mpuHandler.AccOffset.z = 0;
     // Init for calibration Task
     sensors.Calibration.GetTime = &xTaskGetTickCount;
@@ -448,7 +443,7 @@ static void MX_TIM5_Init(void) {
     htim5.Instance = TIM5;
     htim5.Init.Prescaler = 64;
     htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
-    htim5.Init.Period = 20000;
+    htim5.Init.Period = 5000;
     htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
     htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
     if (HAL_TIM_Base_Init(&htim5) != HAL_OK) {
@@ -645,8 +640,8 @@ int _write(int file, char *outgoing, int len) {
 void Default_task(void *pvParameters) {
     printf("*** Welcome to Flight Controller Software ***\r\n");
     // xTaskCreate(&GPS_task, "Gps", 512, NULL, 2, &GpsTask);
-    xTaskCreate(&Loop_task, "Loop", 256, NULL, 3, &LoopTask);
-    xTaskCreate(&Control_task, "Control", 256, NULL, 2, &ControlTask);
+    xTaskCreate(&Loop_task, "Loop", 256, NULL, 4, &LoopTask);
+    xTaskCreate(&Control_task, "Control", 512, NULL, 3, &ControlTask);
     xTaskCreate(&Feedback_task, "FeedBack", 256, NULL, 2, &FeedbackTask);
     vTaskDelete(DefaultTask);
     for (;;) {
@@ -669,6 +664,9 @@ void Loop_task(void *pvParameters) {
             } else {
             }
         }
+#if MOTOR_CONFIG == 1
+        check_motor_vibrations();
+#endif
         // Detect calibration
         if (Control.Control.JoyStick.Thrust < 1020) {
             if (Control.Control.JoyStick.Yaw > 1900 &&
@@ -772,8 +770,8 @@ void Calibration_task(void *pvParameters) {
                    sensors.mpuHandler.GyroOffset.x,
                    sensors.mpuHandler.GyroOffset.y,
                    sensors.mpuHandler.GyroOffset.z);
-                HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin | LED3_Pin,
-                                  GPIO_PIN_SET);
+            HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin | LED3_Pin,
+                              GPIO_PIN_SET);
             while (Control.Control.JoyStick.Thrust >= 1030) {
                 HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
                 vTaskDelay(500);
@@ -834,6 +832,49 @@ void Calibration_task(void *pvParameters) {
     }
 }
 
+void check_motor_vibrations(void) {
+    // Let's declare some variables so we can use them in this subroutine.
+    // int16_t = signed 16 bit integer
+    // uint16_t = unsigned 16 bit integer
+    static int32_t vibration_array[20], avarage_vibration_level,
+        vibration_total_result;
+    static uint8_t array_counter,
+        vibration_counter;  // If the throttle is detected in the lowest
+                            // position. Get the raw gyro and accelerometer
+                            // data.
+    // Calculate the total accelerometer vector.
+    vibration_array[0] = sensors.mpuHandler.AccRaw.totalVector;
+
+    for (array_counter = 16; array_counter > 0;
+         array_counter--) {  // Do this loop 16 times to create an array of
+                             // accelrometer vectors.
+        vibration_array[array_counter] =
+            vibration_array[array_counter - 1];  // Shift every variable one
+                                                 // position up in the array.
+        avarage_vibration_level +=
+            vibration_array[array_counter];  // Add the array value to the
+                                             // acc_av_vector variable.
+    }
+    avarage_vibration_level /= 17;  // Divide the acc_av_vector by 17 to get the
+                                    // avarage total accelerometer vector.
+
+    if (vibration_counter <
+        20) {  // If the vibration_counter is less than 20 do this.
+        vibration_counter++;  // Increment the vibration_counter variable.
+        vibration_total_result +=
+            abs(vibration_array[0] -
+                avarage_vibration_level);  // Add the absolute difference
+                                           // between the avarage vector and
+                                           // current vector to the
+                                           // vibration_total_result variable.
+    } else {
+        vibration_counter =
+            0;  // If the vibration_counter is equal or larger than 20 do this.
+        printf("Vibration=%ld\r\n", vibration_total_result / 50);
+        vibration_total_result =
+            0;  // Reset the vibration_total_result variable.
+    }           // Print the intro to the serial monitor.
+}
 /* USER CODE END 4 */
 
 /**
